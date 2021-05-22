@@ -144,7 +144,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
         // galois::gDebug("Local ID ", node_id, " SID ", subgraph_id, " out ",
         //               out_degrees, " in ", in_degrees);
       },
-      galois::steal());
+      galois::loopname("DegreeCountingDoAll"), galois::steal());
 
   TimerStop(&timer);
 }
@@ -222,7 +222,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
         assert(out_location == local_subgraph_out_degrees_[subgraph_id]);
         assert(in_location == local_subgraph_in_degrees_[subgraph_id]);
       },
-      galois::steal());
+      galois::loopname("EdgeCreationDoAll"), galois::steal());
   TimerStop(&timer);
 }
 

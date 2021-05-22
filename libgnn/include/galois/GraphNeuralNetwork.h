@@ -199,6 +199,9 @@ public:
   //! most literature
   void GradientPropagation();
 
+  //! Call whenever resize occurs to correct reuse of pointers for layers
+  void CorrectBackwardLinks();
+
 private:
   static const constexpr char* kRegionName = "GraphNeuralNetwork";
 

@@ -43,11 +43,23 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       prev_layer_columns = graph_->node_feature_length();
     }
 
+    // max dims
     GNNLayerDimensions layer_dims = {.input_rows    = max_rows,
                                      .input_columns = prev_layer_columns,
                                      .output_columns =
                                          config_.intermediate_layer_size(i),
                                      .output_rows = max_rows};
+
+    // test minibatch size: if it's not enabled, then currently the full
+    // graph is used (should really only subgraph the test nodes, though;
+    // that's a TODO)
+    if ((config_.train_minibatch_size() || config_.use_train_subgraph_) &&
+        config_.test_minibatch_size()) {
+      galois::gInfo("Not allocating rows");
+      // set to 0 here to make it allocate nothing
+      layer_dims.input_rows  = 0;
+      layer_dims.output_rows = 0;
+    }
 
     switch (layer_type) {
     case GNNLayerType::kGraphConvolutional:
@@ -126,6 +138,12 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
       .output_columns = config_.output_layer_size(),
       .output_rows    = max_rows};
 
+  if ((config_.train_minibatch_size() || config_.use_train_subgraph_) &&
+      config_.test_minibatch_size()) {
+    output_dims.input_rows  = 0;
+    output_dims.output_rows = 0;
+  }
+
   switch (config_.output_layer_type()) {
   case (GNNOutputLayerType::kSoftmax):
     gnn_layers_.push_back(std::move(std::make_unique<SoftmaxLayer>(
@@ -199,6 +217,7 @@ float galois::GraphNeuralNetwork::MinibatchedTesting() {
     // resize layer matrices
     graph_->ConstructSampledSubgraph(num_sampled_layers);
     graph_->EnableSubgraphChooseAll();
+    CorrectBackwardLinks();
 
     const PointerWithSize<galois::GNNFloat> batch_pred = DoInference();
     std::pair<uint32_t, uint32_t> correct_total =
@@ -260,6 +279,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       }
     }
     graph_->ConstructSampledSubgraph(num_sampled_layers);
+    CorrectBackwardLinks();
   }
 
   galois::StatTimer epoch_timer("TrainingTime", kRegionName);
@@ -284,6 +304,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
           l_count++;
         }
       }
+      CorrectBackwardLinks();
     }
 
     // beginning of epoch sampling
@@ -322,7 +343,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       }
       // resize layer matrices
       graph_->ConstructSampledSubgraph(num_sampled_layers);
-
+      CorrectBackwardLinks();
       mb_timer.stop();
     }
 
@@ -344,9 +365,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         galois::StatTimer mb_timer("MinibatchSubgraphCreation", kRegionName);
         mb_timer.start();
 
-        const std::string btime_name("Epoch" + std::to_string(epoch) + "Batch" +
-                                     std::to_string(batch_num));
-        galois::StatTimer batch_timer(btime_name.c_str(), kRegionName);
+        galois::Timer batch_timer;
         batch_timer.start();
         work_left_.reset();
         galois::gInfo("Epoch ", epoch, " batch ", batch_num++);
@@ -393,6 +412,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
         // resize layer matrices
         graph_->ConstructSampledSubgraph(num_sampled_layers);
+        CorrectBackwardLinks();
         // XXX resizes above only work for SAGE layers; will break if other
         // layers are tested
 
@@ -423,8 +443,10 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
             graph_->DisableSubgraph();
             for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
                  layer++) {
+              // TODO nuclear resize
               (*layer)->ResizeRows(graph_->size());
             }
+            CorrectBackwardLinks();
             SetLayerPhases(galois::GNNPhase::kTest);
             graph_->EnableSubgraphChooseAll();
             const PointerWithSize<galois::GNNFloat> test_pred = DoInference();
@@ -443,6 +465,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
             galois::runtime::reportStat_Single(kRegionName, test_name_acc,
                                                test_acc);
           }
+
           // report the training time elapsed at this point in time
           galois::runtime::reportStat_Single(
               kRegionName,
@@ -484,14 +507,18 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       DisableTimers();
       // disable subgraph
       graph_->DisableSubgraph();
-      for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
-           layer++) {
-        (*layer)->ResizeRows(graph_->size());
-      }
       graph_->EnableSubgraphChooseAll();
     }
 
     if (do_validate) {
+      // XXX induced subgraph here
+      for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
+           layer++) {
+        // nuclear resize
+        (*layer)->ResizeRows(graph_->size());
+      }
+
+      CorrectBackwardLinks();
       validation_timer.start();
       SetLayerPhases(galois::GNNPhase::kValidate);
       const PointerWithSize<galois::GNNFloat> val_pred = DoInference();
@@ -512,6 +539,12 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       float test_acc;
 
       if (!config_.test_minibatch_size()) {
+        for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
+             layer++) {
+          // nuclear resize
+          (*layer)->ResizeRows(graph_->size());
+        }
+        CorrectBackwardLinks();
         SetLayerPhases(galois::GNNPhase::kTest);
         const PointerWithSize<galois::GNNFloat> test_pred = DoInference();
         epoch_test_timer.stop();
@@ -566,6 +599,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
           }
         }
         graph_->ConstructSampledSubgraph(num_sampled_layers);
+        CorrectBackwardLinks();
       }
 
       EnableTimers();
@@ -578,19 +612,21 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   DisableTimers();
   // disable subgraph
   graph_->DisableSubgraph();
-  // TODO only do this when necessary
-  for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end(); layer++) {
-    (*layer)->ResizeRows(graph_->size());
-  }
+  graph_->EnableSubgraphChooseAll();
 
   // check test accuracy
-  // XXX test batching
   galois::StatTimer test_timer("FinalTestRun", kRegionName);
   float global_accuracy;
 
   test_timer.start();
 
   if (!config_.test_minibatch_size()) {
+    for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
+         layer++) {
+      // TODO nuclear resize
+      (*layer)->ResizeRows(graph_->size());
+    }
+    CorrectBackwardLinks();
     SetLayerPhases(galois::GNNPhase::kTest);
     const PointerWithSize<galois::GNNFloat> predictions = DoInference();
     global_accuracy = GetGlobalAccuracy(predictions);
@@ -671,5 +707,17 @@ void galois::GraphNeuralNetwork::GradientPropagation() {
     // at this point in the layer the gradients exist; use the gradients to
     // update the weights of the layer
     gnn_layers_[layer_index]->OptimizeLayer(optimizer_.get(), layer_index);
+  }
+}
+
+void galois::GraphNeuralNetwork::CorrectBackwardLinks() {
+  // layer chain pointer
+  PointerWithSize<GNNFloat> prev_output_layer(nullptr, 0);
+  for (size_t layer_num = 0; layer_num < gnn_layers_.size(); layer_num++) {
+    // first layer is nullptr so can be ignored
+    if (layer_num != 0) {
+      gnn_layers_[layer_num]->UpdateBackwardOutput(&prev_output_layer);
+    }
+    prev_output_layer = gnn_layers_[layer_num]->GetForwardOutput();
   }
 }

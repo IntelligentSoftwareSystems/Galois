@@ -100,14 +100,26 @@ public:
   virtual void ResizeRows(size_t new_row_count) {
     layer_dimensions_.input_rows  = new_row_count;
     layer_dimensions_.output_rows = new_row_count;
-    // TODO(loc) output matrix should be resized if space becomes an issue,
-    // else just use first S rows (S = subgraph size)
+    ResizeOutputMatrix(new_row_count);
   }
+
   virtual void ResizeInputOutputRows(size_t input_row, size_t output_row) {
     layer_dimensions_.input_rows  = input_row;
     layer_dimensions_.output_rows = output_row;
-    // TODO(loc) output matrix should be resized if space becomes an issue,
-    // else just use first S rows (S = subgraph size)
+    ResizeOutputMatrix(output_row);
+  }
+
+  void ResizeOutputMatrix(size_t new_output_row);
+
+  void UpdateBackwardOutput(PointerWithSize<GNNFloat>* backward_output_matrix) {
+    // XXX(hochan) gpu
+    if (layer_number_ != 0) {
+      assert(backward_output_matrix->size() >=
+             layer_dimensions_.input_rows * layer_dimensions_.input_columns);
+    } else {
+      GALOIS_LOG_FATAL("Layer 0 should not need to update backward output");
+    }
+    p_backward_output_matrix_ = *backward_output_matrix;
   }
 
   GNNPhase layer_phase() { return layer_phase_; }
@@ -348,7 +360,6 @@ protected:
   }
 #endif
 
-  //! Mask a input size'd matrix's rows that correspond to mirrors
   void MaskInputNonMasters(PointerWithSize<GNNFloat>* input) {
     MaskInputNonMasters(input, std::numeric_limits<size_t>::max());
   }

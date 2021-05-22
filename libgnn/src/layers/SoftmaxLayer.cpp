@@ -24,7 +24,7 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
         if (IsSampledLayer()) {
           if ((layer_phase_ == GNNPhase::kTrain ||
                layer_phase_ == GNNPhase::kBatch) &&
-              !graph_.IsInSampledGraph(i)) {
+              !graph_.IsInSampledGraphSubgraph(i)) {
             // XXX
             VectorZero(feature_length,
                        &p_backward_output_matrix_[i * feature_length]);
@@ -60,7 +60,8 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
       },
       // TODO chunk size?
       // steal on as some threads may have nothing to work on
-      galois::steal(), galois::loopname("SoftmaxForward"));
+      // galois::steal(), galois::loopname("SoftmaxForward"));
+      galois::steal());
 #ifndef NDEBUG
   GNNFloat reduced_loss = loss_accum.reduce();
   size_t t              = handled.reduce();
@@ -93,12 +94,13 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
   const size_t feature_length = layer_dimensions_.input_columns;
 
   galois::do_all(
-      galois::iterate(graph_.begin(), graph_.end()),
+      // galois::iterate(graph_.begin(), graph_.end()),
+      galois::iterate(size_t{0}, layer_dimensions_.input_rows),
       [&](const unsigned node) {
         if (graph_.IsValidForPhase(node, layer_phase_)) {
           if (IsSampledLayer()) {
             if (layer_phase_ == GNNPhase::kTrain &&
-                !graph_.IsInSampledGraph(node))
+                !graph_.IsInSampledGraphSubgraph(node))
               return;
           }
 

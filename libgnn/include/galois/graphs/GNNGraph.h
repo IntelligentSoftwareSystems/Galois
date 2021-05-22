@@ -585,6 +585,15 @@ public:
     assert(node_id < size());
     return partitioned_graph_->getData(node_id);
   }
+  bool IsInSampledGraphSubgraph(size_t node_id) const {
+    // TODO(loc) GPU
+    assert(node_id < size());
+    if (use_subgraph_) {
+      return partitioned_graph_->getData(ConvertToLID(node_id));
+    } else {
+      return partitioned_graph_->getData(node_id);
+    }
+  }
 
   //! Calculate norm factor considering the entire graph
   void CalculateFullNormFactor();

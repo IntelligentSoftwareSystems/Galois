@@ -44,14 +44,6 @@ public:
       : SAGELayer(layer_num, graph, backward_output_matrix, dimensions,
                   GNNLayerConfig(), SAGELayerConfig()) {}
 
-  void ResizeRows(size_t new_row_count) {
-    galois::gDebug("Resizing SAGE layer for sampled graph from ",
-                   layer_dimensions_.input_rows);
-    GNNLayer::ResizeRows(new_row_count);
-    galois::gDebug("To ", layer_dimensions_.input_rows);
-    // TODO(loc) resize input matrices if space is reason for doing this
-  }
-
   void InitSelfWeightsTo1() {
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
@@ -135,6 +127,18 @@ private:
 
   //! Sync second set of weight gradients
   void WeightGradientSyncSum2();
+
+  void ResizeRows(size_t new_row_count) {
+    GNNLayer::ResizeRows(new_row_count);
+    ResizeIntermediates(new_row_count, new_row_count);
+  }
+
+  void ResizeInputOutputRows(size_t input_row, size_t output_row) {
+    GNNLayer::ResizeInputOutputRows(input_row, output_row);
+    ResizeIntermediates(input_row, output_row);
+  }
+
+  void ResizeIntermediates(size_t new_input_rows, size_t new_output_rows);
 
   //! SAGE config params
   SAGELayerConfig sage_config_;

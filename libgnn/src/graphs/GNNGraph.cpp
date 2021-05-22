@@ -697,7 +697,6 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPU(
 float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
     PointerWithSize<GNNFloat> predictions, GNNPhase phase, bool) {
   // check owned nodes' accuracy
-  assert((num_label_classes_ * size()) == predictions.size());
   num_correct_.reset();
   total_checked_.reset();
 
@@ -722,7 +721,7 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
         }
       },
       // steal on as some threads may have nothing to work on
-      galois::steal(), galois::loopname("GlobalAccuracy"));
+      galois::steal());
 
   size_t global_correct = num_correct_.reduce();
   size_t global_checked = total_checked_.reduce();
@@ -736,7 +735,6 @@ float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
 std::pair<uint32_t, uint32_t> galois::graphs::GNNGraph::GetBatchAccuracy(
     PointerWithSize<GNNFloat> predictions) {
   // check owned nodes' accuracy
-  assert((num_label_classes_ * size()) == predictions.size());
   num_correct_.reset();
   total_checked_.reset();
 

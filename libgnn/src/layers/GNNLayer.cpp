@@ -103,6 +103,31 @@ galois::GNNLayer::GNNLayer(size_t layer_num,
 #endif
 }
 
+void galois::GNNLayer::ResizeOutputMatrix(size_t new_output_row) {
+  size_t num_output_elements =
+      new_output_row * layer_dimensions_.output_columns;
+
+  if (!config_.disable_output &&
+      (forward_output_matrix_.size() < num_output_elements)) {
+    galois::gInfo(graph_.host_prefix(), "Resizing layer ", layer_number_,
+                  ", forward output matrix to ", num_output_elements, " (",
+                  FloatElementsToGB(num_output_elements), " GB)");
+    // resize with a bit of a buffer to prevent possible future resizes
+    size_t buffer_size = (num_output_elements * 0.02);
+    forward_output_matrix_.resize(num_output_elements + buffer_size, 0);
+  }
+
+  // XXX(hochan) GPU end
+#ifdef GALOIS_ENABLE_GPU
+  // XXX(hochan)
+#endif
+  // reinitialize the PointerWithSize wrappers
+  p_forward_output_matrix_ = PointerWithSize<GNNFloat>(forward_output_matrix_);
+#ifdef GALOIS_ENABLE_GPU
+  // XXX(hochan)
+#endif
+}
+
 void galois::GNNLayer::GlorotBengioInit(std::vector<GNNFloat>* vector_to_init) {
   float max = std::sqrt(6.0) / std::sqrt(layer_dimensions_.output_columns +
                                          layer_dimensions_.input_columns);
@@ -272,20 +297,23 @@ void galois::GNNLayer::Activation() {
     base_gpu_object_.ActivationGPU(p_forward_output_matrix_.size());
   } else {
 #endif
-    if (activation_memo_.size() == 0) {
-      activation_memo_.resize(forward_output_matrix_.size());
+    if (activation_memo_.size() != p_forward_output_matrix_.size()) {
+      activation_memo_.resize(p_forward_output_matrix_.size());
     }
     activation_memo_.reset();
+    assert(activation_memo_.size() == p_forward_output_matrix_.size());
+    assert(layer_dimensions_.output_rows * layer_dimensions_.output_columns <=
+           p_forward_output_matrix_.size());
 
     galois::do_all(galois::iterate(static_cast<size_t>(0),
                                    layer_dimensions_.output_rows *
                                        layer_dimensions_.output_columns),
                    [&](size_t i) {
-                     if (forward_output_matrix_[i] > 0.0) {
+                     if (p_forward_output_matrix_[i] > 0.0) {
                        // do nothing, keep value; set the memo though
                        activation_memo_.set(i);
                      } else {
-                       forward_output_matrix_[i] = 0;
+                       p_forward_output_matrix_[i] = 0;
                      }
                    });
 #ifdef GALOIS_ENABLE_GPU
@@ -305,6 +333,8 @@ void galois::GNNLayer::ActivationDerivative(
                                              gradient->size());
   } else {
 #endif
+    assert(gradient->size() >=
+           layer_dimensions_.output_rows * layer_dimensions_.output_columns);
     // TODO only does relu at the moment; should check user specified activation
     // and act accordingly
     // keep gradient if the original output was greater than 0
@@ -362,8 +392,6 @@ void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input,
   assert(*(graph_.begin_owned()) == 0);
   size_t start_node = *(graph_.end_owned());
   size_t end_node   = graph_.active_size();
-  size_t row_index  = layer_dimensions_.input_columns;
-  assert((row_index * layer_dimensions_.input_rows) <= input->size());
 
   if (start_node > max_rows) {
     start_node = max_rows;
@@ -371,6 +399,10 @@ void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input,
   if (end_node > max_rows) {
     end_node = max_rows;
   }
+
+  size_t row_index = layer_dimensions_.input_columns;
+  assert(start_node * row_index <= input->size());
+  assert(end_node * row_index <= input->size());
 
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {
@@ -396,7 +428,6 @@ void galois::GNNLayer::MaskGradientNonMasters(
   assert(*(graph_.begin_owned()) == 0);
   size_t start_node = *(graph_.end_owned());
   size_t end_node   = graph_.active_size();
-  size_t row_index  = layer_dimensions_.output_columns;
 
   if (start_node > max_rows) {
     start_node = max_rows;
@@ -404,6 +435,16 @@ void galois::GNNLayer::MaskGradientNonMasters(
   if (end_node > max_rows) {
     end_node = max_rows;
   }
+
+  size_t row_index = layer_dimensions_.output_columns;
+  if (start_node > max_rows) {
+    start_node = max_rows;
+  }
+  if (end_node > max_rows) {
+    end_node = max_rows;
+  }
+  assert(start_node * row_index <= gradient->size());
+  assert(end_node * row_index <= gradient->size());
 
 #ifdef GALOIS_ENABLE_GPU
   if (device_personality == DevicePersonality::GPU_CUDA) {

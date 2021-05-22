@@ -47,6 +47,25 @@ public:
   BackwardPhase(PointerWithSize<galois::GNNFloat> in_out,
                 PointerWithSize<galois::GNNFloat>* input_gradient) final;
 
+  void ResizeRows(size_t new_row_count) {
+    layer_dimensions_.input_rows  = new_row_count;
+    layer_dimensions_.output_rows = new_row_count;
+    // no output resize
+    if (input_loss_.size() < new_row_count) {
+      input_loss_.resize(new_row_count * 1.02);
+    }
+  }
+
+  void ResizeInputOutputRows(size_t in, size_t out) {
+    assert(in == out);
+    layer_dimensions_.input_rows  = in;
+    layer_dimensions_.output_rows = out;
+    // no output resize
+    if (input_loss_.size() < in) {
+      input_loss_.resize(in * 1.02);
+    }
+  }
+
 private:
 #ifdef GALOIS_ENABLE_GPU
   SoftmaxLayerGPU gpu_object_;

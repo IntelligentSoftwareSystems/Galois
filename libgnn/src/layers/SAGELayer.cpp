@@ -141,6 +141,86 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
   GALOIS_LOG_VERBOSE("SAGE layer initialized");
 }
 
+void galois::SAGELayer::ResizeIntermediates(size_t new_input_rows,
+                                            size_t new_output_rows) {
+  size_t num_in_temp_elements =
+      new_output_rows * layer_dimensions_.input_columns;
+  galois::gDebug("Layer num ", layer_number_, " ", in_temp_1_.size(), " and ",
+                 num_in_temp_elements, " ", layer_dimensions_.input_columns,
+                 " ", layer_dimensions_.output_columns);
+
+  // if in temp is smaller than out temp, or if dropout exists
+  if (!config_.disable_dropout || config_.disable_aggregate_after_update ||
+      layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+    galois::gDebug("in first if");
+    if (in_temp_1_.size() < num_in_temp_elements) {
+      galois::gDebug("in the resize");
+      galois::gInfo(graph_.host_prefix(), "Resize layer ", layer_number_,
+                    ", SAGE input temp var 1 ", num_in_temp_elements, " (",
+                    FloatElementsToGB(num_in_temp_elements), " GB)");
+      size_t buffer_size = num_in_temp_elements * 0.02;
+#ifdef GALOIS_ENABLE_GPU
+      // XXX(hochan)
+      if (device_personality == DevicePersonality::GPU_CUDA) {
+        gpu_object_.AllocateInTemp1(num_in_temp_elements + buffer_size);
+      } else {
+#endif
+        in_temp_1_.resize(num_in_temp_elements + buffer_size, 0);
+#ifdef GALOIS_ENABLE_GPU
+      }
+#endif
+      // XXX(hochan) GPU
+      p_in_temp_1_ = PointerWithSize<GNNFloat>(in_temp_1_);
+    }
+  }
+
+  // only on in dropout case + if in temp is smaller than out temp
+  if (!config_.disable_dropout &&
+      (config_.disable_aggregate_after_update ||
+       layer_dimensions_.input_columns <= layer_dimensions_.output_columns)) {
+    if (in_temp_2_.size() < num_in_temp_elements) {
+      galois::gInfo(graph_.host_prefix(), "Resize layer ", layer_number_,
+                    ", SAGE input temp var 2 ", num_in_temp_elements, " (",
+                    FloatElementsToGB(num_in_temp_elements), " GB)");
+      size_t buffer_size = num_in_temp_elements * 0.02;
+#ifdef GALOIS_ENABLE_GPU
+      if (device_personality == DevicePersonality::GPU_CUDA) {
+        gpu_object_.AllocateInTemp2(num_in_temp_elements + buffer_size);
+      } else {
+#endif
+        in_temp_2_.resize(num_in_temp_elements + buffer_size, 0);
+#ifdef GALOIS_ENABLE_GPU
+      }
+#endif
+      // XXX(hochan) GPU
+      p_in_temp_2_ = PointerWithSize<GNNFloat>(in_temp_2_);
+    }
+  }
+
+  size_t num_output_temp_elements =
+      new_input_rows * layer_dimensions_.output_columns;
+  // only needed if out temp would be smaller than intemp
+  if (!config_.disable_aggregate_after_update &&
+      layer_dimensions_.input_columns > layer_dimensions_.output_columns) {
+    if (out_temp_.size() < num_output_temp_elements) {
+      galois::gInfo(graph_.host_prefix(), "Resize layer ", layer_number_,
+                    ", SAGE output temp var ", num_output_temp_elements, " (",
+                    FloatElementsToGB(num_output_temp_elements), " GB)");
+       size_t buffer_size = (num_output_temp_elements * 0.02);
+#ifdef GALOIS_ENABLE_GPU
+      if (device_personality == DevicePersonality::GPU_CUDA) {
+        gpu_object_.AllocateOutTemp(num_output_temp_elements + buffer_size);
+      } else {
+#endif
+        out_temp_.resize(num_output_temp_elements + buffer_size, 0);
+#ifdef GALOIS_ENABLE_GPU
+      }
+#endif
+      p_out_temp_ = PointerWithSize<GNNFloat>(out_temp_);
+    }
+  }
+}
+
 void galois::SAGELayer::WeightGradientSyncSum2() {
   galois::StatTimer t("Sync_WeightGradientsSum2", kRegionName);
   TimerStart(&t);
@@ -174,6 +254,10 @@ void galois::SAGELayer::WeightGradientSyncSum2() {
 
 const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
+  galois::gDebug(
+      "Layer ", layer_number_, " dims: ", layer_dimensions_.input_rows, " ",
+      layer_dimensions_.output_rows, " ", layer_dimensions_.input_columns, " ",
+      layer_dimensions_.output_columns);
   galois::StatTimer timer("ForwardPhase", kRegionName);
   TimerStart(&timer);
 
@@ -200,15 +284,28 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
   // flip aggregate/update if dimensions favor it (do less work)
   if (config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
+    if (!config_.disable_dropout && (layer_phase_ == GNNPhase::kTrain)) {
+      assert(p_in_temp_2_.size() >=
+             layer_dimensions_.output_rows * layer_dimensions_.input_columns);
+    } else {
+      assert(p_in_temp_1_.size() >=
+             layer_dimensions_.output_rows * layer_dimensions_.input_columns);
+    }
     // aggregation and update
     AggregateAll(layer_dimensions_.input_columns, input_data, agg_data,
                  &input_column_intermediates_);
+    assert(p_forward_output_matrix_.size() >=
+           layer_dimensions_.output_columns * layer_dimensions_.output_columns);
     UpdateEmbeddings(agg_data, p_forward_output_matrix_.data(), true);
   } else {
+    assert(p_out_temp_.size() >=
+           layer_dimensions_.input_rows * layer_dimensions_.output_columns);
     // update to aggregate
     // FW
     UpdateEmbeddings(input_data, p_out_temp_.data(), false);
     // A(FW)
+    assert(p_forward_output_matrix_.size() >=
+           layer_dimensions_.output_columns * layer_dimensions_.output_columns);
     AggregateAll(layer_dimensions_.output_columns, p_out_temp_.data(),
                  p_forward_output_matrix_.data(),
                  &output_column_intermediates_);
@@ -595,12 +692,12 @@ void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
       galois::CBlasSGEMM(
           CblasNoTrans, CblasNoTrans, layer_dimensions_.output_rows,
           layer_dimensions_.input_columns, layer_dimensions_.output_columns,
-          node_embeddings, layer_weights_.data(), output);
+          node_embeddings, p_layer_weights_.data(), output);
     } else {
       galois::CBlasSGEMM(
           CblasNoTrans, CblasNoTrans, layer_dimensions_.input_rows,
           layer_dimensions_.input_columns, layer_dimensions_.output_columns,
-          node_embeddings, layer_weights_.data(), output);
+          node_embeddings, p_layer_weights_.data(), output);
     }
 #ifdef GALOIS_ENABLE_GPU
   }
@@ -653,12 +750,12 @@ void galois::SAGELayer::UpdateEmbeddingsDerivative(const GNNFloat* gradients,
       galois::CBlasSGEMM(
           CblasNoTrans, CblasTrans, layer_dimensions_.output_rows,
           layer_dimensions_.output_columns, layer_dimensions_.input_columns,
-          gradients, layer_weights_.data(), output);
+          gradients, p_layer_weights_.data(), output);
     } else {
       galois::CBlasSGEMM(CblasNoTrans, CblasTrans, layer_dimensions_.input_rows,
                          layer_dimensions_.output_columns,
                          layer_dimensions_.input_columns, gradients,
-                         layer_weights_.data(), output);
+                         p_layer_weights_.data(), output);
     }
 #ifdef GALOIS_ENABLE_GPU
   }
