@@ -13,6 +13,11 @@
 
 extern llvm::cl::opt<unsigned> num_threads;
 extern llvm::cl::opt<unsigned> num_epochs;
+extern llvm::cl::opt<unsigned> layer_size;
+extern llvm::cl::opt<galois::GNNLayerType> cl_layer_type;
+extern llvm::cl::opt<unsigned> train_minibatch_size;
+extern llvm::cl::opt<unsigned> test_minibatch_size;
+extern llvm::cl::opt<bool> do_graph_sampling;
 
 #ifdef GALOIS_ENABLE_GPU
 std::string personality_str(DevicePersonality p);
@@ -23,6 +28,8 @@ namespace internal {
 void heteroSetup();
 };
 #endif
+
+const char* GNNLayerToString(galois::GNNLayerType s);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Init functions

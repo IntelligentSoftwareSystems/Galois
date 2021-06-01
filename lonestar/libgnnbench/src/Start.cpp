@@ -45,6 +45,18 @@ static void PrintVersion(llvm::raw_ostream& out) {
   out.flush();
 }
 
+const char* GNNLayerToString(galois::GNNLayerType s) {
+  switch (s) {
+  case galois::GNNLayerType::kSAGE:
+    return "sage";
+  case galois::GNNLayerType::kGraphConvolutional:
+    return "gcn";
+  default:
+    GALOIS_LOG_FATAL("Invalid gnn layer");
+    return "";
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void GNNBenchStart(int argc, char** argv, const char* app) {
@@ -95,7 +107,15 @@ void GNNBenchStart(int argc, char** argv, const char* app, const char* desc,
     galois::runtime::reportParam("GNNBench", "Input", input_name);
     galois::runtime::reportParam("GNNBench", "PartitionScheme",
                                  GNNPartitionToString(partition_scheme));
-    // XXX report the rest of the command line options
+    galois::runtime::reportParam("GNNBench", "HiddenLayerSize", layer_size);
+    galois::runtime::reportParam("GNNBench", "LayerType",
+                                 GNNLayerToString(cl_layer_type));
+    galois::runtime::reportParam("GNNBench", "TrainingMinibatchSize",
+                                 train_minibatch_size);
+    galois::runtime::reportParam("GNNBench", "TestingMinibatchSize",
+                                 test_minibatch_size);
+    galois::runtime::reportParam("GNNBench", "IsGraphSampled",
+                                 do_graph_sampling);
   }
 
   char name[256];

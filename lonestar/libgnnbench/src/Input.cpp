@@ -32,18 +32,26 @@ llvm::cl::opt<unsigned> num_layers(
         "Number of intermediate layers in the neural network (default 2))"),
     cll::init(2));
 
-llvm::cl::list<unsigned> layer_sizes(
-    "layerSizes",
+// llvm::cl::list<unsigned> layer_sizes(
+//    "layerSizes",
+//    cll::desc(
+//        "Comma separated list of numbers specifying "
+//        "intermediate layer sizes (does not include output); default sizes are
+//        " "16 until last layer which is the size of the # of labels"),
+//    cll::CommaSeparated);
+
+llvm::cl::opt<unsigned> layer_size(
+    "layerSize",
     cll::desc(
-        "Comma separated list of numbers specifying "
+        "Number specifying "
         "intermediate layer sizes (does not include output); default sizes are "
         "16 until last layer which is the size of the # of labels"),
-    cll::CommaSeparated);
+    cll::init(16));
 
-llvm::cl::list<galois::GNNLayerType> cl_layer_types(
-    "layerTypes",
-    cll::desc("Comma separated list of layer types specifying "
-              "intermediate layers (does not include output)"),
+llvm::cl::opt<galois::GNNLayerType> cl_layer_type(
+    "layerType",
+    cll::desc("Layer type specifying "
+              "intermediate layers (does not include output); default SAGE"),
     cll::values(
         clEnumValN(galois::GNNLayerType::kGraphConvolutional, "gcn",
                    "Graph Convolutional Layer (default)"),
@@ -51,7 +59,7 @@ llvm::cl::list<galois::GNNLayerType> cl_layer_types(
                    "SAGE layer (GCN with concat + mean)"),
         clEnumValN(galois::GNNLayerType::kL2Norm, "l2norm", "L2 norm layer"),
         clEnumValN(galois::GNNLayerType::kDense, "dense", "Dense layer")),
-    cll::CommaSeparated);
+    cll::init(galois::GNNLayerType::kSAGE));
 
 llvm::cl::list<unsigned> cl_fan_out_vector(
     "samplingFanOut",
@@ -169,19 +177,22 @@ const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
 //! Initializes the vector of layer sizes from command line args + graph
 std::vector<galois::GNNLayerType> CreateLayerTypesVector() {
   std::vector<galois::GNNLayerType> layer_types;
-  if (!cl_layer_types.size()) {
-    // default is all GCN layers
-    for (size_t i = 0; i < num_layers; i++) {
-      layer_types.emplace_back(galois::GNNLayerType::kGraphConvolutional);
-    }
-  } else {
-    GALOIS_LOG_VASSERT(cl_layer_types.size() == num_layers,
-                       "Number layer types should be {} not {}", num_layers,
-                       cl_layer_types.size());
-    for (size_t i = 0; i < num_layers; i++) {
-      layer_types.emplace_back(cl_layer_types[i]);
-    }
+  for (size_t i = 0; i < num_layers; i++) {
+    layer_types.emplace_back(cl_layer_type);
   }
+  // if (!cl_layer_types.size()) {
+  //  // default is all GCN layers
+  //  for (size_t i = 0; i < num_layers; i++) {
+  //    layer_types.emplace_back(galois::GNNLayerType::kGraphConvolutional);
+  //  }
+  //} else {
+  //  GALOIS_LOG_VASSERT(cl_layer_types.size() == num_layers,
+  //                     "Number layer types should be {} not {}", num_layers,
+  //                     cl_layer_types.size());
+  //  for (size_t i = 0; i < num_layers; i++) {
+  //    layer_types.emplace_back(cl_layer_types[i]);
+  //  }
+  //}
   return layer_types;
 }
 
@@ -190,34 +201,41 @@ std::vector<size_t>
 CreateLayerSizesVector(const galois::graphs::GNNGraph* gnn_graph) {
   // set layer sizes for intermdiate and output layers
   std::vector<size_t> layer_sizes_vector;
-  if (layer_sizes.size()) {
-    GALOIS_LOG_ASSERT(layer_sizes.size() == num_layers);
-    for (size_t i = 0; i < num_layers; i++) {
-      layer_sizes_vector.emplace_back(layer_sizes[i]);
-    }
-    // verify user satisfies last intermediate layer needing to have same size
-    // as # label classes
-    if (layer_sizes_vector.back() != gnn_graph->GetNumLabelClasses()) {
-      galois::gWarn(
-          "Size of last layer (", layer_sizes_vector.back(),
-          ") is not equal to # label classes: forcefully changing it to ",
-          gnn_graph->GetNumLabelClasses());
-      layer_sizes_vector.back()   = gnn_graph->GetNumLabelClasses();
-      layer_sizes[num_layers - 1] = gnn_graph->GetNumLabelClasses();
-    }
 
-    GALOIS_LOG_ASSERT(layer_sizes_vector.back() ==
-                      gnn_graph->GetNumLabelClasses());
-  } else {
-    // default 16 for everything until last 2
-    for (size_t i = 0; i < num_layers - 1; i++) {
-      layer_sizes_vector.emplace_back(16);
-    }
-    // last 2 sizes must be equivalent to # label classes; this is the last
-    // intermediate layer
-    layer_sizes_vector.emplace_back(gnn_graph->GetNumLabelClasses());
+  // if (layer_sizes.size()) {
+  //  GALOIS_LOG_ASSERT(layer_sizes.size() == num_layers);
+  //  for (size_t i = 0; i < num_layers; i++) {
+  //    layer_sizes_vector.emplace_back(layer_sizes[i]);
+  //  }
+  //  // verify user satisfies last intermediate layer needing to have same size
+  //  // as # label classes
+  //  if (layer_sizes_vector.back() != gnn_graph->GetNumLabelClasses()) {
+  //    galois::gWarn(
+  //        "Size of last layer (", layer_sizes_vector.back(),
+  //        ") is not equal to # label classes: forcefully changing it to ",
+  //        gnn_graph->GetNumLabelClasses());
+  //    layer_sizes_vector.back()   = gnn_graph->GetNumLabelClasses();
+  //    layer_sizes[num_layers - 1] = gnn_graph->GetNumLabelClasses();
+  //  }
+
+  //  GALOIS_LOG_ASSERT(layer_sizes_vector.back() ==
+  //                    gnn_graph->GetNumLabelClasses());
+  //} else {
+  //  // default 16 for everything until last 2
+  //  for (size_t i = 0; i < num_layers - 1; i++) {
+  //    layer_sizes_vector.emplace_back(16);
+  //  }
+  //  // last 2 sizes must be equivalent to # label classes; this is the last
+  //  // intermediate layer
+  //  layer_sizes_vector.emplace_back(gnn_graph->GetNumLabelClasses());
+  //}
+
+  for (size_t i = 0; i < num_layers - 1; i++) {
+    layer_sizes_vector.emplace_back(layer_size);
   }
-
+  // last 2 sizes must be equivalent to # label classes; this is the last
+  // intermediate layer
+  layer_sizes_vector.emplace_back(gnn_graph->GetNumLabelClasses());
   // TODO
   // for now only softmax layer which dictates the output size of the last
   // intermediate layer + size of the output layer
@@ -245,29 +263,44 @@ CreateOptimizer(const galois::graphs::GNNGraph* gnn_graph) {
 
   // optimizer sizes are based on intermediate layer sizes, input feats, and
   // # label classes
-  if (layer_sizes.size()) {
-    GALOIS_LOG_ASSERT(layer_sizes.size() == num_layers);
-    opt_sizes.emplace_back(gnn_graph->node_feature_length() * layer_sizes[0]);
-    // assumption here is that if it reached this point then layer sizes were
-    // already sanity checked previously (esp. last layer)
-    for (size_t i = 1; i < num_layers; i++) {
-      opt_sizes.emplace_back(layer_sizes[i] * layer_sizes[i - 1]);
-    }
+  // if (layer_sizes.size()) {
+  //  GALOIS_LOG_ASSERT(layer_sizes.size() == num_layers);
+  //  opt_sizes.emplace_back(gnn_graph->node_feature_length() * layer_sizes[0]);
+  //  // assumption here is that if it reached this point then layer sizes were
+  //  // already sanity checked previously (esp. last layer)
+  //  for (size_t i = 1; i < num_layers; i++) {
+  //    opt_sizes.emplace_back(layer_sizes[i] * layer_sizes[i - 1]);
+  //  }
+  //} else {
+  //  // everything is size 16 until last
+  //  if (num_layers == 1) {
+  //    // single layer requires a bit of special handling
+  //    opt_sizes.emplace_back(gnn_graph->node_feature_length() *
+  //                           gnn_graph->GetNumLabelClasses());
+  //  } else {
+  //    // first
+  //    opt_sizes.emplace_back(gnn_graph->node_feature_length() * 16);
+  //    for (size_t i = 1; i < num_layers - 1; i++) {
+  //      opt_sizes.emplace_back(16 * 16);
+  //    }
+  //    // last
+  //    opt_sizes.emplace_back(16 * gnn_graph->GetNumLabelClasses());
+  //  }
+  //}
+
+  // everything is size 16 until last
+  if (num_layers == 1) {
+    // single layer requires a bit of special handling
+    opt_sizes.emplace_back(gnn_graph->node_feature_length() *
+                           gnn_graph->GetNumLabelClasses());
   } else {
-    // everything is size 16 until last
-    if (num_layers == 1) {
-      // single layer requires a bit of special handling
-      opt_sizes.emplace_back(gnn_graph->node_feature_length() *
-                             gnn_graph->GetNumLabelClasses());
-    } else {
-      // first
-      opt_sizes.emplace_back(gnn_graph->node_feature_length() * 16);
-      for (size_t i = 1; i < num_layers - 1; i++) {
-        opt_sizes.emplace_back(16 * 16);
-      }
-      // last
-      opt_sizes.emplace_back(16 * gnn_graph->GetNumLabelClasses());
+    // first
+    opt_sizes.emplace_back(gnn_graph->node_feature_length() * layer_size);
+    for (size_t i = 1; i < num_layers - 1; i++) {
+      opt_sizes.emplace_back(layer_size * layer_size);
     }
+    // last
+    opt_sizes.emplace_back(layer_size * gnn_graph->GetNumLabelClasses());
   }
   GALOIS_LOG_ASSERT(opt_sizes.size() == num_layers);
 
