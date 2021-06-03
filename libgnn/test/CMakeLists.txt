@@ -25,6 +25,9 @@ add_executable(mkl_micro_delete_galois mkl_micro.cpp)
 target_link_libraries(mkl_micro_delete_galois galois_gnn)
 target_compile_definitions(mkl_micro_delete_galois PUBLIC USE_SHARED_GALOIS_DELETE=1)
 
+add_executable(gstl_test gstl_test.cpp)
+target_link_libraries(gstl_test galois_shmem)
+
 ################################################################################
 
 add_executable(gnngraph-test gnngraph-test.cpp)
