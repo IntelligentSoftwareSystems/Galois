@@ -893,7 +893,7 @@ private:
                      size_t bit_set_count, std::vector<size_t>& indices,
                      galois::PODResizeableArray<unsigned int>& offsets,
                      galois::DynamicBitSet& bit_set_comm, TwoDVecType& two_d_vec,
-                     galois::runtime::SendBuffer& b) {
+                     galois::runtime::SendBuffer& b, size_t feat_size) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string serialize_timer_str(syncTypeStr + "SerializeMessage_" +
                                     get_run_identifier(loopName));
@@ -908,16 +908,19 @@ private:
     } else if (data_mode == gidsData) {
       offsets.resize(bit_set_count);
       convertLIDToGID<syncType>(loopName, indices, offsets);
+      two_d_vec.resize(bit_set_count * feat_size);
       Tserialize.start();
       gSerialize(b, data_mode, bit_set_count, offsets, two_d_vec.data());
       Tserialize.stop();
     } else if (data_mode == offsetsData) {
       offsets.resize(bit_set_count);
+      two_d_vec.resize(bit_set_count * feat_size);
       Tserialize.start();
       gSerialize(b, data_mode, bit_set_count, offsets, two_d_vec.data());
       Tserialize.stop();
     } else if (data_mode == bitsetData) {
       Tserialize.start();
+      two_d_vec.resize(bit_set_count * feat_size);
       gSerialize(b, data_mode, bit_set_count, bit_set_comm, two_d_vec.data());
       Tserialize.stop();
     } else { // onlyData
@@ -2358,7 +2361,7 @@ private:
 
         SerializeMessage2D<async, syncType>(
             loopName, data_mode, bit_set_count, indices, offsets, bit_set_comm,
-            two_d_array, b);
+            two_d_array, b, SyncFnTy::FeatVecSize());
       } else {
         // TODO(loc/hochan) GPU
         //if (data_mode == noData) {
