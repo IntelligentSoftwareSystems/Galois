@@ -68,6 +68,10 @@ struct SampleFlagBitset {
 struct GNNSumAggregate {
   using ValTy = galois::gstl::Vector<GNNFloat>;
 
+  static size_t FeatVecSize() {
+    return gnn_matrix_to_sync_column_length_;
+  }
+
   //! return a vector of floats to sync
   static ValTy extract(uint32_t node_id, char&) {
     // It should be a CPU synchronizing substrate.
@@ -87,6 +91,16 @@ struct GNNSumAggregate {
   //! own vector
   static bool reduce(uint32_t node_id, char&, ValTy y) {
     assert(y.size() == gnn_matrix_to_sync_column_length_);
+    // loop and do addition
+    for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
+      // XXX vectorized add
+      gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_ + i] +=
+          y[i];
+    }
+    return true;
+  }
+
+  static bool reduce(uint32_t node_id, char&, const ValTy::value_type* y) {
     // loop and do addition
     for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
       // XXX vectorized add
@@ -116,6 +130,15 @@ struct GNNSumAggregate {
     }
   }
 
+  static void setVal(uint32_t node_id, char&, const ValTy::value_type* y) {
+    // loop and do addition
+    for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
+      gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_ + i] =
+          y[i];
+    }
+  }
+
+
   // GPU options TODO for GPU
   static bool extract_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
     return false;
@@ -134,6 +157,10 @@ struct GNNSumAggregate {
 
 struct GNNSampleSumAggregate {
   using ValTy = galois::gstl::Vector<GNNFloat>;
+
+  static size_t FeatVecSize() {
+    return gnn_matrix_to_sync_column_length_;
+  }
 
   //! return a vector of floats to sync
   static ValTy extract(uint32_t node_id, char&) {
@@ -175,12 +202,40 @@ struct GNNSampleSumAggregate {
     return true;
   }
 
+  static bool reduce(uint32_t node_id, char&, ValTy::value_type* y) {
+    if ((*gnn_lid_to_sid_pointer_)[node_id] ==
+        std::numeric_limits<uint32_t>::max()) {
+      return false;
+    }
+
+    // loop and do addition
+    for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
+      gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id] *
+                              gnn_matrix_to_sync_column_length_ +
+                          i] += y[i];
+    }
+    return true;
+  }
+
   //! No-op: readAny = overwritten anyways
   static void reset(uint32_t, char&) {}
 
   //! element wise set
   static void setVal(uint32_t node_id, char&, ValTy y) {
     assert(y.size() == gnn_matrix_to_sync_column_length_);
+    if ((*gnn_lid_to_sid_pointer_)[node_id] ==
+        std::numeric_limits<uint32_t>::max()) {
+      return;
+    }
+
+    // loop and do addition
+    for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
+      gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id] *
+                              gnn_matrix_to_sync_column_length_ +
+                          i] = y[i];
+    }
+  }
+  static void setVal(uint32_t node_id, char&, ValTy::value_type* y) {
     if ((*gnn_lid_to_sid_pointer_)[node_id] ==
         std::numeric_limits<uint32_t>::max()) {
       return;

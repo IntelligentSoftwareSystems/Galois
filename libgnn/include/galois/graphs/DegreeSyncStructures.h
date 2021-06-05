@@ -60,6 +60,10 @@ struct InitialDegreeSync {
 struct SubgraphDegreeSync {
   using ValTy = galois::gstl::Vector<uint32_t>;
 
+  static size_t FeatVecSize() {
+    return gnn_sampled_out_degrees_->size();;
+  }
+
   //! return a vector of floats to sync
   static ValTy extract(uint32_t lid, char&) {
     ValTy vec_to_send(gnn_sampled_out_degrees_->size());
@@ -80,6 +84,13 @@ struct SubgraphDegreeSync {
     return true;
   }
 
+  static bool reduce(uint32_t lid, char&, ValTy::value_type* y) {
+    for (size_t degree_index = 0; degree_index < gnn_sampled_out_degrees_->size(); degree_index++) {
+      (*gnn_sampled_out_degrees_)[degree_index][lid] += y[degree_index];
+    }
+    return true;
+  }
+
   //! No-op: readAny = overwritten anyways; can probably get away with no-op
   static void reset(uint32_t lid, char&) {
     for (galois::LargeArray<uint32_t>& layer_degrees :
@@ -95,6 +106,13 @@ struct SubgraphDegreeSync {
       (*gnn_sampled_out_degrees_)[degree_index][lid] = y[degree_index];
     }
   }
+
+  static void setVal(uint32_t lid, char&, ValTy::value_type* y) {
+    for (size_t degree_index = 0; degree_index < gnn_sampled_out_degrees_->size(); degree_index++) {
+      (*gnn_sampled_out_degrees_)[degree_index][lid] = y[degree_index];
+    }
+  }
+
 
   // GPU options TODO for GPU
   static bool extract_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
