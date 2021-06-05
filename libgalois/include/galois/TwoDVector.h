@@ -31,8 +31,10 @@ public:
                 sizeof(T) * fixed_vector_size_);
   }
 
+  PODResizeableArray<T>& edit_data() { return underlying_memory_; }
   const PODResizeableArray<T>& data() { return underlying_memory_; }
   void resize(size_t s) { underlying_memory_.resize(s); }
+  size_t size() const { return underlying_memory_.size(); }
 private:
   size_t num_elements_{0};
   size_t fixed_vector_size_{0};

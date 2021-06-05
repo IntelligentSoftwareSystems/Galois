@@ -72,19 +72,28 @@ struct GNNSumAggregate {
     return gnn_matrix_to_sync_column_length_;
   }
 
+
   //! return a vector of floats to sync
   static ValTy extract(uint32_t node_id, char&) {
     // It should be a CPU synchronizing substrate.
     // If the GPU flag is turned off, then personality does not exist.
     // assert(device_personality == DevicePersonality::CPU);
-    ValTy extracted_vec(gnn_matrix_to_sync_column_length_);
+    ValTy extracted_vec;
+    extracted_vec.reserve(gnn_matrix_to_sync_column_length_);
     for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
       // XXX memcpy
-      extracted_vec[i] =
-          gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_ + i];
+      extracted_vec.emplace_back(
+          gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_ + i]);
     }
     // move constructor should kick in here to avoid return copy
     return extracted_vec;
+  }
+
+  //! return a vector of floats to sync
+  static void ExtractDirect(uint32_t node_id, typename ValTy::value_type* to_write) {
+    std::memcpy(to_write,
+                (char*)&(gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_]),
+                gnn_matrix_to_sync_column_length_ * sizeof(typename ValTy::value_type));
   }
 
   //! reduction is addition in this case; add received vector to
@@ -138,7 +147,6 @@ struct GNNSumAggregate {
     }
   }
 
-
   // GPU options TODO for GPU
   static bool extract_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
     return false;
@@ -167,7 +175,9 @@ struct GNNSampleSumAggregate {
     // It should be a CPU synchronizing substrate.
     // If the GPU flag is turned off, then personality does not exist.
     // assert(device_personality == DevicePersonality::CPU);
-    ValTy extracted_vec(gnn_matrix_to_sync_column_length_, 0.0);
+    //ValTy extracted_vec(gnn_matrix_to_sync_column_length_);
+    ValTy extracted_vec;
+    extracted_vec.reserve(gnn_matrix_to_sync_column_length_);
     if ((*gnn_lid_to_sid_pointer_)[node_id] ==
         std::numeric_limits<uint32_t>::max()) {
       return extracted_vec;
@@ -175,13 +185,23 @@ struct GNNSampleSumAggregate {
 
     for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
       // XXX memcpy
-      extracted_vec[i] =
+      extracted_vec.emplace_back(
           gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id] *
                                   gnn_matrix_to_sync_column_length_ +
-                              i];
+                              i]);
     }
     // move constructor should kick in here to avoid return copy
     return extracted_vec;
+  }
+
+  static void ExtractDirect(uint32_t node_id, typename ValTy::value_type* to_write) {
+    if ((*gnn_lid_to_sid_pointer_)[node_id] ==
+        std::numeric_limits<uint32_t>::max()) {
+      return;
+    }
+    std::memcpy(to_write,
+                (char*)&(gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id]* gnn_matrix_to_sync_column_length_]),
+                gnn_matrix_to_sync_column_length_ * sizeof(typename ValTy::value_type));
   }
 
   //! reduction is addition in this case; add received vector to

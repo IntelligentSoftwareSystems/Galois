@@ -1,4 +1,5 @@
 #include "galois/GNNTypes.h"
+//#include "galois/Logging.h"
 
 namespace galois {
 namespace graphs {
@@ -64,7 +65,6 @@ struct SubgraphDegreeSync {
     return gnn_sampled_out_degrees_->size();;
   }
 
-  //! return a vector of floats to sync
   static ValTy extract(uint32_t lid, char&) {
     ValTy vec_to_send(gnn_sampled_out_degrees_->size());
     size_t count = 0;
@@ -74,6 +74,17 @@ struct SubgraphDegreeSync {
     }
     assert(count == vec_to_send.size());
     return vec_to_send;
+  }
+
+  static void ExtractDirect(uint32_t lid, typename ValTy::value_type* to_write) {
+    size_t count = 0;
+    for (galois::LargeArray<uint32_t>& layer_degrees :
+         *gnn_sampled_out_degrees_) {
+      std::memcpy(&to_write[count],
+                  &layer_degrees[lid],
+                  sizeof(typename ValTy::value_type));
+      count++;
+    }
   }
 
   static bool reduce(uint32_t lid, char&, ValTy y) {

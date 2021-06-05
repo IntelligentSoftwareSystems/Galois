@@ -1199,6 +1199,18 @@ private:
     }
   }
 
+
+  template <typename FnTy, SyncType syncType>
+  void ExtractWrapper2D(size_t lid, typename FnTy::ValTy::value_type* location_to_write) {
+    if (syncType == syncReduce) {
+      FnTy::ExtractDirect(lid, location_to_write);
+      char dummy = 0;
+      FnTy::reset(lid, dummy);
+    } else {
+      FnTy::ExtractDirect(lid, location_to_write);
+    }
+  }
+
   /**
    * Extracts data at provided lid; uses vecIndex to get the correct element
    * from the vector.
@@ -1306,7 +1318,8 @@ private:
             else
               offset = offsets[n];
             size_t lid         = indices[offset];
-            two_d_vector.SetVector(n - start, extractWrapper<FnTy, syncType>(lid));
+
+            ExtractWrapper2D<FnTy, syncType>(lid, (&(two_d_vector.edit_data()[(n - start) * FnTy::FeatVecSize()])));
           },
 #if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
@@ -1321,7 +1334,7 @@ private:
           offset = offsets[n];
 
         size_t lid         = indices[offset];
-        two_d_vector.SetVector(n - start, extractWrapper<FnTy, syncType>(lid));
+        ExtractWrapper2D<FnTy, syncType>(lid, &((two_d_vector.edit_data())[(n - start) * FnTy::FeatVecSize()]));
       }
     }
   }
