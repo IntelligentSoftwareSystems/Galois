@@ -135,6 +135,9 @@ public:
   //! (as determined by offset)
   const uint8_t* data() const { return bufdata.data() + kHeaderSize; }
   uint8_t* data() { return bufdata.data() + kHeaderSize; }
+  uint8_t* DataAtOffset(size_t offset) {
+    return bufdata.data() + kHeaderSize + offset;
+  }
 
   //! Returns the size of the serialize buffer
   size_type size() const { return bufdata.size() - kHeaderSize; }
@@ -1052,10 +1055,9 @@ inline void gDeserialize(DeSerializeBuffer&) {}
  * @param data Object to save data in the iterator type into
  */
 template <typename Iter, typename T>
-auto gDeserializeRaw(Iter iter, T& data)
-    -> decltype(std::declval<typename std::enable_if<
-                    is_memory_copyable<T>::value>::type>(),
-                Iter()) {
+auto gDeserializeRaw(Iter iter, T& data) -> decltype(
+    std::declval<typename std::enable_if<is_memory_copyable<T>::value>::type>(),
+    Iter()) {
   unsigned char* pdata = (unsigned char*)&data;
   for (size_t i = 0; i < sizeof(T); ++i)
     pdata[i] = *iter++;

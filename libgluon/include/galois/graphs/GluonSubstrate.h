@@ -595,6 +595,7 @@ private:
                            galois::PODResizeableArray<unsigned int>& offsets,
                            size_t& bit_set_count,
                            DataCommMode& data_mode) const {
+    // i.e. not set by user
     if (substrateDataMode != onlyData) {
       bitset_comm.reset();
       std::string syncTypeStr =
@@ -619,10 +620,60 @@ private:
           galois::no_stats());
 
       // get the number of set bits and the offsets into the comm bitset
+      // i.e., the things thaneed to be grabbed
       getOffsetsFromBitset<syncType>(loopName, bitset_comm, offsets,
                                      bit_set_count);
     }
 
+    // from the count of things that need to be grabbed determine the data mode
+    // to use
+    data_mode =
+        get_data_mode<typename FnTy::ValTy>(bit_set_count, indices.size());
+  }
+
+  template <typename FnTy, SyncType syncType>
+  void GetBitsetAndOffsets2D(const std::string& loopName,
+                             const std::vector<size_t>& indices,
+                             const galois::DynamicBitSet& bitset_compute,
+                             galois::DynamicBitSet& bitset_comm,
+                             galois::PODResizeableArray<unsigned int>& offsets,
+                             size_t& bit_set_count,
+                             DataCommMode& data_mode) const {
+    // i.e. not set by user
+    if (substrateDataMode != onlyData) {
+      bitset_comm.reset();
+      std::string syncTypeStr =
+          (syncType == syncReduce) ? "Reduce" : "Broadcast";
+      std::string doall_str(syncTypeStr + "Bitset_" + loopName);
+
+      bitset_comm.reset();
+      // determine which local nodes in the indices array need to be
+      // sychronized
+      galois::do_all(
+          galois::iterate(size_t{0}, indices.size()),
+          [&](size_t n) {
+            // assumes each lid is unique as test is not thread safe
+            size_t lid = indices[n];
+            if (bitset_compute.test(lid)) {
+              bitset_comm.set(n);
+            }
+          },
+#if GALOIS_COMM_STATS
+          galois::loopname(get_run_identifier(doall_str).c_str()),
+#endif
+          galois::no_stats());
+
+      // get the number of set bits and the offsets into the comm bitset
+      // i.e., the things thaneed to be grabbed
+      getOffsetsFromBitset<syncType>(loopName, bitset_comm, offsets,
+                                     bit_set_count);
+    }
+
+    // from the count of things that need to be grabbed determine the data mode
+    // to use
+    // NOTE: this function is imprecise as it doesn't get actual size of
+    // vectors but only the size of the wrapper itself, but doesn't matter
+    // for selection purposes
     data_mode =
         get_data_mode<typename FnTy::ValTy>(bit_set_count, indices.size());
   }
@@ -651,6 +702,39 @@ private:
              + sizeof(size_t) // bitset vector size
              + bitset_alloc_size + sizeof(size_t) +
              (numShared * sizeof(typename SyncFnTy::ValTy));
+    }
+  }
+
+  template <typename SyncFnTy>
+  size_t GetMaxSendBufferSizeVecs(uint32_t numShared) {
+    if (substrateDataMode == gidsData) {
+      return sizeof(DataCommMode) + sizeof(size_t) + sizeof(size_t) +
+             (numShared * sizeof(unsigned int)) + sizeof(size_t) +
+             sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy::value_type) *
+              SyncFnTy::FeatVecSize());
+    } else if (substrateDataMode == offsetsData) {
+      return sizeof(DataCommMode) + sizeof(size_t) + sizeof(size_t) +
+             (numShared * sizeof(unsigned int)) + sizeof(size_t) +
+             sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy::value_type) *
+              SyncFnTy::FeatVecSize());
+    } else if (substrateDataMode == bitsetData) {
+      size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
+      return sizeof(DataCommMode) + sizeof(size_t) +
+             sizeof(size_t)   // bitset size
+             + sizeof(size_t) // bitset vector size
+             + bitset_alloc_size + sizeof(size_t) + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy::value_type) *
+              SyncFnTy::FeatVecSize());
+    } else { // onlyData or noData (auto)
+      size_t bitset_alloc_size = ((numShared + 63) / 64) * sizeof(uint64_t);
+      return sizeof(DataCommMode) + sizeof(size_t) +
+             sizeof(size_t)   // bitset size
+             + sizeof(size_t) // bitset vector size
+             + bitset_alloc_size + sizeof(size_t) + sizeof(size_t) +
+             (numShared * sizeof(typename SyncFnTy::ValTy::value_type) *
+              SyncFnTy::FeatVecSize());
     }
   }
 
@@ -731,10 +815,9 @@ private:
   // Message prep functions (buffering, send buffer getting, etc.)
   ////////////////////////////////////////////////////////////////////////////////
 
-  template <
-      SyncType syncType, typename SyncFnTy, typename BitsetFnTy, typename VecTy,
-      bool async,
-      typename std::enable_if<Is2DVector<VecTy>::value>::type* = nullptr>
+  template <SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async,
+            typename std::enable_if<Is2DVector<VecTy>::value>::type* = nullptr>
   void getSendBuffer(std::string loopName, unsigned x,
                      galois::runtime::SendBuffer& b, size_t elem_size) {
     auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
@@ -762,10 +845,9 @@ private:
    * @param b OUTPUT: Buffer that will hold data to send
    * @param elem_size The inner-vector dimesnion of a vector of the vector
    */
-  template <
-      SyncType syncType, typename SyncFnTy, typename BitsetFnTy, typename VecTy,
-      bool async,
-      typename std::enable_if<!Is2DVector<VecTy>::value>::type* = nullptr>
+  template <SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async,
+            typename std::enable_if<!Is2DVector<VecTy>::value>::type* = nullptr>
   void getSendBuffer(std::string loopName, unsigned x,
                      galois::runtime::SendBuffer& b, size_t elem_size) {
     auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
@@ -774,8 +856,8 @@ private:
       syncExtract<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(
           loopName, x, sharedNodes[x], b, elem_size);
     } else {
-      syncExtract<syncType, SyncFnTy, VecTy, async>(
-          loopName, x, sharedNodes[x], b, elem_size);
+      syncExtract<syncType, SyncFnTy, VecTy, async>(loopName, x, sharedNodes[x],
+                                                    b, elem_size);
     }
 
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
@@ -888,12 +970,12 @@ private:
 
   // Calls data on the TwoDVector
   template <bool async, SyncType syncType, typename TwoDVecType>
-  void
-  SerializeMessage2D(std::string loopName, DataCommMode data_mode,
-                     size_t bit_set_count, std::vector<size_t>& indices,
-                     galois::PODResizeableArray<unsigned int>& offsets,
-                     galois::DynamicBitSet& bit_set_comm, TwoDVecType& two_d_vec,
-                     galois::runtime::SendBuffer& b, size_t feat_size) {
+  void SerializeMessage2D(std::string loopName, DataCommMode data_mode,
+                          size_t bit_set_count, std::vector<size_t>& indices,
+                          galois::PODResizeableArray<unsigned int>& offsets,
+                          galois::DynamicBitSet& bit_set_comm,
+                          TwoDVecType& two_d_vec,
+                          galois::runtime::SendBuffer& b, size_t feat_size) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string serialize_timer_str(syncTypeStr + "SerializeMessage_" +
                                     get_run_identifier(loopName));
@@ -926,6 +1008,45 @@ private:
     } else { // onlyData
       Tserialize.start();
       gSerialize(b, data_mode, two_d_vec.data());
+      Tserialize.stop();
+    }
+  }
+
+  // Only serializes the prefix
+  template <SyncType syncType>
+  void
+  SerializeMessagePrefix2D(std::string loopName, DataCommMode data_mode,
+                           size_t bit_set_count, std::vector<size_t>& indices,
+                           galois::PODResizeableArray<unsigned int>& offsets,
+                           galois::DynamicBitSet& bit_set_comm,
+                           galois::runtime::SendBuffer& b) {
+    std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
+    std::string serialize_timer_str(syncTypeStr + "SerializeMessagePrefix_" +
+                                    get_run_identifier(loopName));
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tserialize(
+        serialize_timer_str.c_str(), RNAME);
+    if (data_mode == noData) {
+      Tserialize.start();
+      gSerialize(b, data_mode);
+      Tserialize.stop();
+    } else if (data_mode == gidsData) {
+      offsets.resize(bit_set_count);
+      convertLIDToGID<syncType>(loopName, indices, offsets);
+      Tserialize.start();
+      gSerialize(b, data_mode, bit_set_count, offsets);
+      Tserialize.stop();
+    } else if (data_mode == offsetsData) {
+      offsets.resize(bit_set_count);
+      Tserialize.start();
+      gSerialize(b, data_mode, bit_set_count, offsets);
+      Tserialize.stop();
+    } else if (data_mode == bitsetData) {
+      Tserialize.start();
+      gSerialize(b, data_mode, bit_set_count, bit_set_comm);
+      Tserialize.stop();
+    } else if (data_mode == onlyData) {
+      Tserialize.start();
+      gSerialize(b, data_mode);
       Tserialize.stop();
     }
   }
@@ -1199,9 +1320,9 @@ private:
     }
   }
 
-
   template <typename FnTy, SyncType syncType>
-  void ExtractWrapper2D(size_t lid, typename FnTy::ValTy::value_type* location_to_write) {
+  void ExtractWrapper2D(size_t lid,
+                        typename FnTy::ValTy::value_type* location_to_write) {
     if (syncType == syncReduce) {
       FnTy::ExtractDirect(lid, location_to_write);
       char dummy = 0;
@@ -1300,10 +1421,11 @@ private:
 
   template <typename FnTy, SyncType syncType, typename VecTy,
             bool identity_offsets = false, bool parallelize = true>
-  void ExtractSubset2D(const std::string& loopName,
-                     const std::vector<size_t>& indices, size_t size,
-                     const galois::PODResizeableArray<unsigned int>& offsets,
-                     VecTy& two_d_vector, size_t start = 0) {
+  void ExtractSubsetLazy2D(
+      const std::string& loopName, const std::vector<size_t>& indices,
+      size_t size, const galois::PODResizeableArray<unsigned int>& offsets,
+      galois::runtime::SendBuffer& send_buffer, size_t base_offset) {
+    size_t start = 0;
     if (parallelize) {
       std::string syncTypeStr =
           (syncType == syncReduce) ? "Reduce" : "Broadcast";
@@ -1317,9 +1439,15 @@ private:
               offset = n;
             else
               offset = offsets[n];
-            size_t lid         = indices[offset];
+            size_t lid = indices[offset];
 
-            ExtractWrapper2D<FnTy, syncType>(lid, (&(two_d_vector.edit_data()[(n - start) * FnTy::FeatVecSize()])));
+            ExtractWrapper2D<FnTy, syncType>(
+                lid,
+                (typename FnTy::ValTy::value_type*)(&(send_buffer.DataAtOffset(
+                    base_offset)[(n - start) * FnTy::FeatVecSize() *
+                                 sizeof(typename FnTy::ValTy::value_type)])));
+            // ExtractWrapper2D<FnTy, syncType>(lid,
+            // (&(two_d_vector.edit_data()[(n - start) * FnTy::FeatVecSize()])));
           },
 #if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
@@ -1333,12 +1461,17 @@ private:
         else
           offset = offsets[n];
 
-        size_t lid         = indices[offset];
-        ExtractWrapper2D<FnTy, syncType>(lid, &((two_d_vector.edit_data())[(n - start) * FnTy::FeatVecSize()]));
+        size_t lid = indices[offset];
+
+        ExtractWrapper2D<FnTy, syncType>(
+            lid, (typename FnTy::ValTy::value_type*)(&(send_buffer.DataAtOffset(
+                     base_offset)[(n - start) * FnTy::FeatVecSize() *
+                                  sizeof(typename FnTy::ValTy::value_type)])));
+        // ExtractWrapper2D<FnTy, syncType>(lid, &((two_d_vector.edit_data())[(n
+        // - start) * FnTy::FeatVecSize()]));
       }
     }
   }
-
 
   /**
    * Based on provided arguments, extracts the data that we are interested
@@ -1558,7 +1691,8 @@ private:
 
   // 2D
   template <typename FnTy, SyncType syncType, bool async>
-  void SetWrapper2D(size_t lid, typename FnTy::ValTy::value_type* pointer_to_data,
+  void SetWrapper2D(size_t lid,
+                    typename FnTy::ValTy::value_type* pointer_to_data,
                     galois::DynamicBitSet& bit_set_compute) {
     if (syncType == syncReduce) {
       if (FnTy::reduce(lid, userGraph.getData(lid), pointer_to_data)) {
@@ -1695,8 +1829,9 @@ private:
             else
               offset = offsets[n];
             auto lid = indices[offset];
-            SetWrapper2D<FnTy, syncType, async>(lid, &val_vec[(n - start) * FnTy::FeatVecSize()],
-                                              bit_set_compute);
+            SetWrapper2D<FnTy, syncType, async>(
+                lid, &val_vec[(n - start) * FnTy::FeatVecSize()],
+                bit_set_compute);
           },
 #if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
@@ -1710,12 +1845,11 @@ private:
         else
           offset = offsets[n];
         auto lid = indices[offset];
-        SetWrapper2D<FnTy, syncType, async>(lid, &val_vec[(n - start) * FnTy::FeatVecSize()],
-                                          bit_set_compute);
+        SetWrapper2D<FnTy, syncType, async>(
+            lid, &val_vec[(n - start) * FnTy::FeatVecSize()], bit_set_compute);
       }
     }
   }
-
 
   /**
    * VECTOR BITSET VARIANT.
@@ -2303,16 +2437,13 @@ private:
                                                             1);
   }
 
-  template <
-      SyncType syncType, typename SyncFnTy, typename BitsetFnTy, typename VecTy,
-      bool async>
+  template <SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
   void SyncExtract2D(std::string loopName, unsigned from_id,
                      std::vector<size_t>& indices,
                      galois::runtime::SendBuffer& b, size_t elem_size) {
     uint32_t num                        = indices.size() * elem_size;
     galois::DynamicBitSet& bit_set_comm = syncBitset;
-    static VecTy two_d_array;
-    two_d_array.SetVecSize(SyncFnTy::FeatVecSize());
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
     //////////////////////////////////////////////////////////////////////////////
@@ -2337,7 +2468,7 @@ private:
     if (num > 0) {
       size_t bit_set_count = 0;
       Textractalloc.start();
-      b.reserve(getMaxSendBufferSize<SyncFnTy>(num));
+      b.reserve(GetMaxSendBufferSizeVecs<SyncFnTy>(num));
       Textractalloc.stop();
 
       Textractbatch.start();
@@ -2354,30 +2485,53 @@ private:
         offsets.reserve(maxSharedSize);
         bit_set_comm.resize(num);
         offsets.resize(num);
-        two_d_array.Create(num);
         Textractalloc.stop();
         const galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get();
 
-        getBitsetAndOffsets<SyncFnTy, syncType>(
+        GetBitsetAndOffsets2D<SyncFnTy, syncType>(
             loopName, indices, bit_set_compute, bit_set_comm, offsets,
             bit_set_count, data_mode);
 
-        if (data_mode == onlyData) {
-          bit_set_count = indices.size();
-          ExtractSubset2D<SyncFnTy, syncType, VecTy, true, true>(
-              loopName, indices, bit_set_count, offsets, two_d_array);
-        } else if (data_mode !=
-                   noData) { // bitsetData or offsetsData or gidsData
-          ExtractSubset2D<SyncFnTy, syncType, VecTy, false, true>(
-              loopName, indices, bit_set_count, offsets, two_d_array);
-        }
+        // serialize the prefix for the buffer based on data type: the data
+        // itself gets serialized directly into the buffer later
+        SerializeMessagePrefix2D<syncType>(loopName, data_mode, bit_set_count,
+                                           indices, offsets, bit_set_comm, b);
 
-        SerializeMessage2D<async, syncType>(
-            loopName, data_mode, bit_set_count, indices, offsets, bit_set_comm,
-            two_d_array, b, SyncFnTy::FeatVecSize());
+        if (data_mode != noData) {
+          size_t lazy_buffer_size = 0;
+          if (data_mode == gidsData) {
+            lazy_buffer_size = bit_set_count * SyncFnTy::FeatVecSize();
+          } else if (data_mode == offsetsData) {
+            lazy_buffer_size = bit_set_count * SyncFnTy::FeatVecSize();
+          } else if (data_mode == bitsetData) {
+            lazy_buffer_size = bit_set_count * SyncFnTy::FeatVecSize();
+          } else if (data_mode == onlyData) {
+            lazy_buffer_size = num * SyncFnTy::FeatVecSize();
+          }
+
+          size_t base_offset = 0;
+          if (lazy_buffer_size > 0) {
+            auto lazy_buffer = gSerializeLazySeq(
+                b, lazy_buffer_size,
+                (galois::PODResizeableArray<
+                    typename SyncFnTy::ValTy::value_type>*)nullptr);
+            base_offset = lazy_buffer.off;
+          }
+
+          // serialize the actual data directly into the buffer with lazy
+          // serialization
+          if (data_mode == onlyData) {
+            bit_set_count = indices.size();
+            ExtractSubsetLazy2D<SyncFnTy, syncType, VecTy, true, true>(
+                loopName, indices, bit_set_count, offsets, b, base_offset);
+          } else { // bitsetData or offsetsData or gidsData
+            ExtractSubsetLazy2D<SyncFnTy, syncType, VecTy, false, true>(
+                loopName, indices, bit_set_count, offsets, b, base_offset);
+          }
+        }
       } else {
         // TODO(loc/hochan) GPU
-        //if (data_mode == noData) {
+        // if (data_mode == noData) {
         //  b.resize(0);
         //  if (!async) {
         //    gSerialize(b, data_mode);
@@ -2423,7 +2577,6 @@ private:
     galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(RNAME, metadata_str,
                                                             1);
   }
-
 
   /**
    * Vector bitset variant.
@@ -2807,11 +2960,9 @@ private:
   }
 
   // TODO (loc) way too much code duplication
-  template <
-      SyncType syncType, typename SyncFnTy, typename BitsetFnTy, typename VecTy,
-      bool async>
-  size_t SyncRecvApply2D(uint32_t from_id,
-                         galois::runtime::RecvBuffer& buf,
+  template <SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+            typename VecTy, bool async>
+  size_t SyncRecvApply2D(uint32_t from_id, galois::runtime::RecvBuffer& buf,
                          std::string loopName) {
     ////////////////////////////////////////////////////////////////////////////
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
@@ -2825,7 +2976,7 @@ private:
     ////////////////////////////////////////////////////////////////////////////
 
     galois::DynamicBitSet& bit_set_comm = syncBitset;
-    //static VecTy two_d_vector;
+    // static VecTy two_d_vector;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
     auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
@@ -2850,7 +3001,8 @@ private:
           size_t bit_set_count = num;
           size_t buf_start     = 0;
 
-          using DeserialPOD = galois::PODResizeableArray<typename VecTy::value_type>;
+          using DeserialPOD =
+              galois::PODResizeableArray<typename VecTy::value_type>;
           DeserialPOD deserial_pod;
 
           // deserialize the rest of the data in the buffer depending on the
@@ -2872,24 +3024,25 @@ private:
           }
 
           if (data_mode == onlyData) {
-            SetSubset2D<decltype(sharedNodes[from_id]), SyncFnTy, syncType, DeserialPOD,
-                      async, true, true>(loopName, sharedNodes[from_id],
-                                         bit_set_count, offsets, deserial_pod,
-                                         bit_set_compute);
+            SetSubset2D<decltype(sharedNodes[from_id]), SyncFnTy, syncType,
+                        DeserialPOD, async, true, true>(
+                loopName, sharedNodes[from_id], bit_set_count, offsets,
+                deserial_pod, bit_set_compute);
           } else if (data_mode == dataSplit || data_mode == dataSplitFirst) {
-            SetSubset2D<decltype(sharedNodes[from_id]), SyncFnTy, syncType, DeserialPOD,
-                      async, true, true>(loopName, sharedNodes[from_id],
-                                         bit_set_count, offsets, deserial_pod,
-                                         bit_set_compute, buf_start);
+            SetSubset2D<decltype(sharedNodes[from_id]), SyncFnTy, syncType,
+                        DeserialPOD, async, true, true>(
+                loopName, sharedNodes[from_id], bit_set_count, offsets,
+                deserial_pod, bit_set_compute, buf_start);
           } else if (data_mode == gidsData) {
-            SetSubset2D<decltype(offsets), SyncFnTy, syncType, DeserialPOD, async, true,
-                      true>(loopName, offsets, bit_set_count, offsets, deserial_pod,
-                            bit_set_compute);
+            SetSubset2D<decltype(offsets), SyncFnTy, syncType, DeserialPOD,
+                        async, true, true>(loopName, offsets, bit_set_count,
+                                           offsets, deserial_pod,
+                                           bit_set_compute);
           } else { // bitsetData or offsetsData
-            SetSubset2D<decltype(sharedNodes[from_id]), SyncFnTy, syncType, DeserialPOD,
-                      async, false, true>(loopName, sharedNodes[from_id],
-                                          bit_set_count, offsets, deserial_pod,
-                                          bit_set_compute);
+            SetSubset2D<decltype(sharedNodes[from_id]), SyncFnTy, syncType,
+                        DeserialPOD, async, false, true>(
+                loopName, sharedNodes[from_id], bit_set_count, offsets,
+                deserial_pod, bit_set_compute);
           }
         } else {
           // TODO(loc/hochan)
@@ -3480,13 +3633,14 @@ private:
   // 2D vector
   template <WriteLocation writeLocation, ReadLocation readLocation,
             typename ReduceFnTy, typename BitsetFnTy, bool async,
-            typename std::enable_if<IsVector<typename ReduceFnTy::ValTy>::value>::type* = nullptr>
+            typename std::enable_if<
+                IsVector<typename ReduceFnTy::ValTy>::value>::type* = nullptr>
   void reduce(std::string loopName, size_t elem_size) {
     std::string timer_str("Reduce_" + get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> TsyncReduce(timer_str.c_str(),
                                                          RNAME);
 
-    using T = typename ReduceFnTy::ValTy::value_type;
+    using T     = typename ReduceFnTy::ValTy::value_type;
     using VecTy = galois::TwoDVector<T>;
 
     TsyncReduce.start();
@@ -3511,7 +3665,8 @@ private:
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
             typename ReduceFnTy, typename BitsetFnTy, bool async,
-            typename std::enable_if<!IsVector<typename ReduceFnTy::ValTy>::value>::type* = nullptr>
+            typename std::enable_if<
+                !IsVector<typename ReduceFnTy::ValTy>::value>::type* = nullptr>
   void reduce(std::string loopName, size_t elem_size) {
     std::string timer_str("Reduce_" + get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> TsyncReduce(timer_str.c_str(),
@@ -3554,7 +3709,8 @@ private:
   // 2d
   template <WriteLocation writeLocation, ReadLocation readLocation,
             typename BroadcastFnTy, typename BitsetFnTy, bool async,
-            typename std::enable_if<IsVector<typename BroadcastFnTy::ValTy>::value>::type* = nullptr>
+            typename std::enable_if<IsVector<
+                typename BroadcastFnTy::ValTy>::value>::type* = nullptr>
   void broadcast(std::string loopname, size_t elem_size) {
     std::string timer_str("Broadcast_" + get_run_identifier(loopname));
     galois::CondStatTimer<GALOIS_COMM_STATS> TsyncBroadcast(timer_str.c_str(),
@@ -3585,7 +3741,8 @@ private:
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
             typename BroadcastFnTy, typename BitsetFnTy, bool async,
-            typename std::enable_if<!IsVector<typename BroadcastFnTy::ValTy>::value>::type* = nullptr>
+            typename std::enable_if<!IsVector<
+                typename BroadcastFnTy::ValTy>::value>::type* = nullptr>
   void broadcast(std::string loopName, size_t elem_size) {
     std::string timer_str("Broadcast_" + get_run_identifier(loopName));
     galois::CondStatTimer<GALOIS_COMM_STATS> TsyncBroadcast(timer_str.c_str(),
