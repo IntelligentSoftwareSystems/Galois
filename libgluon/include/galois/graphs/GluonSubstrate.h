@@ -1114,6 +1114,44 @@ private:
     Tdeserialize.stop();
   }
 
+  template <SyncType syncType>
+  void DeserializeMessagePrefix(
+      std::string loopName, DataCommMode data_mode, uint32_t num,
+      galois::runtime::RecvBuffer& buf, size_t& bit_set_count,
+      galois::PODResizeableArray<unsigned int>& offsets,
+      galois::DynamicBitSet& bit_set_comm, size_t& buf_start, size_t& retval,
+      size_t& vec_size) {
+    std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
+    std::string serialize_timer_str(syncTypeStr + "DeserializeMessage_" +
+                                    get_run_identifier(loopName));
+    galois::CondStatTimer<GALOIS_COMM_STATS> Tdeserialize(
+        serialize_timer_str.c_str(), RNAME);
+    Tdeserialize.start();
+
+    // get other metadata associated with message if mode isn't OnlyData
+    if (data_mode != onlyData) {
+      galois::runtime::gDeserialize(buf, bit_set_count);
+
+      if (data_mode == gidsData) {
+        galois::runtime::gDeserialize(buf, offsets);
+        convertGIDToLID<syncType>(loopName, offsets);
+      } else if (data_mode == offsetsData) {
+        galois::runtime::gDeserialize(buf, offsets);
+      } else if (data_mode == bitsetData) {
+        bit_set_comm.resize(num);
+        galois::runtime::gDeserialize(buf, bit_set_comm);
+      } else if (data_mode == dataSplit) {
+        galois::runtime::gDeserialize(buf, buf_start);
+      } else if (data_mode == dataSplitFirst) {
+        galois::runtime::gDeserialize(buf, retval);
+      }
+    }
+    // Grab data size but not data
+    galois::runtime::gDeserialize(buf, vec_size);
+
+    Tdeserialize.stop();
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Other helper functions
   ////////////////////////////////////////////////////////////////////////////////
@@ -1446,8 +1484,6 @@ private:
                 (typename FnTy::ValTy::value_type*)(&(send_buffer.DataAtOffset(
                     base_offset)[(n - start) * FnTy::FeatVecSize() *
                                  sizeof(typename FnTy::ValTy::value_type)])));
-            // ExtractWrapper2D<FnTy, syncType>(lid,
-            // (&(two_d_vector.edit_data()[(n - start) * FnTy::FeatVecSize()])));
           },
 #if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier(doall_str).c_str()),
@@ -1467,8 +1503,6 @@ private:
             lid, (typename FnTy::ValTy::value_type*)(&(send_buffer.DataAtOffset(
                      base_offset)[(n - start) * FnTy::FeatVecSize() *
                                   sizeof(typename FnTy::ValTy::value_type)])));
-        // ExtractWrapper2D<FnTy, syncType>(lid, &((two_d_vector.edit_data())[(n
-        // - start) * FnTy::FeatVecSize()]));
       }
     }
   }
@@ -1807,18 +1841,16 @@ private:
   }
 
   // 2D; vecty is a PODResize
-  template <typename IndicesVecTy, typename FnTy, SyncType syncType,
-            typename VecTy, bool async, bool identity_offsets = false,
-            bool parallelize = true>
+  template <typename IndicesVecTy, typename FnTy, SyncType syncType, bool async,
+            bool identity_offsets = false, bool parallelize = true>
   void SetSubset2D(const std::string& loopName, const IndicesVecTy& indices,
                    size_t size,
                    const galois::PODResizeableArray<unsigned int>& offsets,
-                   VecTy& val_vec, galois::DynamicBitSet& bit_set_compute,
-                   size_t start = 0) {
+                   galois::runtime::RecvBuffer& buf,
+                   galois::DynamicBitSet& bit_set_compute, size_t start = 0) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string doall_str(syncTypeStr + "SetVal_" +
                           get_run_identifier(loopName));
-
     if (parallelize) {
       galois::do_all(
           galois::iterate(start, start + size),
@@ -1830,7 +1862,10 @@ private:
               offset = offsets[n];
             auto lid = indices[offset];
             SetWrapper2D<FnTy, syncType, async>(
-                lid, &val_vec[(n - start) * FnTy::FeatVecSize()],
+                lid,
+                (typename FnTy::ValTy::value_type*)&(
+                    buf.data()[(n - start) * FnTy::FeatVecSize() *
+                               sizeof(typename FnTy::ValTy::value_type)]),
                 bit_set_compute);
           },
 #if GALOIS_COMM_STATS
@@ -1846,7 +1881,11 @@ private:
           offset = offsets[n];
         auto lid = indices[offset];
         SetWrapper2D<FnTy, syncType, async>(
-            lid, &val_vec[(n - start) * FnTy::FeatVecSize()], bit_set_compute);
+            lid,
+            (typename FnTy::ValTy::value_type*)(&(
+                buf.data()[(n - start) * FnTy::FeatVecSize() *
+                           sizeof(typename FnTy::ValTy::value_type)])),
+            bit_set_compute);
       }
     }
   }
@@ -2976,7 +3015,6 @@ private:
     ////////////////////////////////////////////////////////////////////////////
 
     galois::DynamicBitSet& bit_set_comm = syncBitset;
-    // static VecTy two_d_vector;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
     auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
@@ -3001,21 +3039,15 @@ private:
           size_t bit_set_count = num;
           size_t buf_start     = 0;
 
-          using DeserialPOD =
-              galois::PODResizeableArray<typename VecTy::value_type>;
-          DeserialPOD deserial_pod;
-
-          // deserialize the rest of the data in the buffer depending on the
-          // data mode; arguments passed in here are mostly output vars
-          deserializeMessage<syncType>(loopName, data_mode, num, buf,
-                                       bit_set_count, offsets, bit_set_comm,
-                                       buf_start, retval, deserial_pod);
+          size_t vec_size = 0;
+          DeserializeMessagePrefix<syncType>(
+              loopName, data_mode, num, buf, bit_set_count, offsets,
+              bit_set_comm, buf_start, retval, vec_size);
 
           bit_set_comm.reserve(maxSharedSize);
           offsets.reserve(maxSharedSize);
 
           galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get();
-
           if (data_mode == bitsetData) {
             size_t bit_set_count2;
             getOffsetsFromBitset<syncType>(loopName, bit_set_comm, offsets,
@@ -3023,26 +3055,27 @@ private:
             assert(bit_set_count == bit_set_count2);
           }
 
+          // note for all these the deserialize buffer is extracted from
+          // directly rather than copying it over to another vector
           if (data_mode == onlyData) {
             SetSubset2D<decltype(sharedNodes[from_id]), SyncFnTy, syncType,
-                        DeserialPOD, async, true, true>(
-                loopName, sharedNodes[from_id], bit_set_count, offsets,
-                deserial_pod, bit_set_compute);
+                        async, true, true>(loopName, sharedNodes[from_id],
+                                           bit_set_count, offsets, buf,
+                                           bit_set_compute);
           } else if (data_mode == dataSplit || data_mode == dataSplitFirst) {
             SetSubset2D<decltype(sharedNodes[from_id]), SyncFnTy, syncType,
-                        DeserialPOD, async, true, true>(
-                loopName, sharedNodes[from_id], bit_set_count, offsets,
-                deserial_pod, bit_set_compute, buf_start);
+                        async, true, true>(loopName, sharedNodes[from_id],
+                                           bit_set_count, offsets, buf,
+                                           bit_set_compute, buf_start);
           } else if (data_mode == gidsData) {
-            SetSubset2D<decltype(offsets), SyncFnTy, syncType, DeserialPOD,
-                        async, true, true>(loopName, offsets, bit_set_count,
-                                           offsets, deserial_pod,
-                                           bit_set_compute);
+            SetSubset2D<decltype(offsets), SyncFnTy, syncType, async, true,
+                        true>(loopName, offsets, bit_set_count, offsets, buf,
+                              bit_set_compute);
           } else { // bitsetData or offsetsData
             SetSubset2D<decltype(sharedNodes[from_id]), SyncFnTy, syncType,
-                        DeserialPOD, async, false, true>(
-                loopName, sharedNodes[from_id], bit_set_count, offsets,
-                deserial_pod, bit_set_compute);
+                        async, false, true>(loopName, sharedNodes[from_id],
+                                            bit_set_count, offsets, buf,
+                                            bit_set_compute);
           }
         } else {
           // TODO(loc/hochan)
