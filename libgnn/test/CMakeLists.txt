@@ -1,3 +1,5 @@
+find_package(OpenMP)
+
 add_executable(mkl_micro mkl_micro.cpp)
 target_link_directories(mkl_micro PUBLIC ${MKL_LIBRARIES})
 target_include_directories(mkl_micro PUBLIC
@@ -10,8 +12,8 @@ target_link_directories(mkl_micro_omp PUBLIC ${MKL_LIBRARIES})
 target_include_directories(mkl_micro_omp PUBLIC
   ${MKL_INCLUDE_DIRS}
 )
-target_link_libraries(mkl_micro_omp ${INTEL_LIBS})
-target_link_libraries(mkl_micro_omp -fopenmp)
+target_link_libraries(mkl_micro_omp PUBLIC ${INTEL_LIBS} OpenMP::OpenMP_CXX)
+target_compile_definitions(mkl_micro_omp PUBLIC USE_OMP=1)
 
 add_executable(mkl_micro_sgalois mkl_micro.cpp)
 target_link_libraries(mkl_micro_sgalois galois_gnn)
@@ -24,6 +26,33 @@ target_compile_definitions(mkl_micro_dgalois PUBLIC USE_DIST_GALOIS=1)
 add_executable(mkl_micro_delete_galois mkl_micro.cpp)
 target_link_libraries(mkl_micro_delete_galois galois_gnn)
 target_compile_definitions(mkl_micro_delete_galois PUBLIC USE_SHARED_GALOIS_DELETE=1)
+
+################################################################################
+
+#add_executable(single_mkl_micro single_mkl_micro.cpp)
+#target_link_directories(single_mkl_micro PUBLIC ${MKL_LIBRARIES})
+#target_include_directories(single_mkl_micro PUBLIC
+#  ${MKL_INCLUDE_DIRS}
+#)
+#target_link_libraries(single_mkl_micro ${SINGLE_INTEL_LIBS})
+
+add_executable(single_mkl_micro_omp single_mkl_micro.cpp)
+target_link_directories(single_mkl_micro_omp PUBLIC ${MKL_LIBRARIES})
+target_include_directories(single_mkl_micro_omp PUBLIC
+  ${MKL_INCLUDE_DIRS}
+)
+target_link_libraries(single_mkl_micro_omp ${SINGLE_INTEL_LIBS} OpenMP::OpenMP_CXX)
+target_compile_definitions(single_mkl_micro_omp PUBLIC USE_OMP=1)
+
+add_executable(single_mkl_micro_sgalois single_mkl_micro.cpp)
+target_link_libraries(single_mkl_micro_sgalois galois_gnn_single)
+target_compile_definitions(single_mkl_micro_sgalois PUBLIC USE_SHARED_GALOIS=1)
+
+add_executable(single_mkl_micro_dgalois single_mkl_micro.cpp)
+target_link_libraries(single_mkl_micro_dgalois galois_gnn_single)
+target_compile_definitions(single_mkl_micro_dgalois PUBLIC USE_DIST_GALOIS=1)
+
+################################################################################
 
 add_executable(gstl_test gstl_test.cpp)
 target_link_libraries(gstl_test galois_shmem)
