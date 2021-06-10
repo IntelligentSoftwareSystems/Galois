@@ -82,6 +82,7 @@ int main(int argc, char* argv[]) {
 
   // dimensions from test case
   size_t a_dim = 12000000;
+  //size_t a_dim = 120000;
   size_t b_dim = 128;
   size_t c_dim = 16;
 
@@ -129,6 +130,8 @@ int main(int argc, char* argv[]) {
     //           matrix_2.data(), matrix_3.data());
     CBlasSGEMM(CblasTrans, CblasNoTrans, b_dim, a_dim, c_dim, matrix_1.data(),
                matrix_2.data(), matrix_3.data());
+    //CBlasSGEMM(CblasNoTrans, CblasTrans, b_dim, a_dim, c_dim, matrix_1.data(),
+    //           matrix_2.data(), matrix_3.data());
     auto stop = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::time_point_cast<std::chrono::milliseconds>(stop) - 

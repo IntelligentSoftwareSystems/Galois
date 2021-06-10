@@ -6,11 +6,11 @@
 
 #ifdef USE_SHARED_GALOIS
 #include "galois/Galois.h"
-#include "galois/LargeArray.h"
+#include "galois/PODResizeableArray.h"
 #endif
 #ifdef USE_DIST_GALOIS
 #include "galois/DistGalois.h"
-#include "galois/LargeArray.h"
+#include "galois/PODResizeableArray.h"
 #endif
 
 #ifdef USE_OMP
@@ -57,25 +57,60 @@ void CBlasSGEMMGalois(const CBLAS_TRANSPOSE trans_a, const CBLAS_TRANSPOSE trans
   size_t lead_dim_b =
       (trans_b == CblasNoTrans) ? output_columns : input_columns;
 
+  static std::vector<galois::PODResizeableArray<float>> temps;
+  if (trans_a == CblasTrans) {
+    temps.resize(galois::getActiveThreads());
+  }
+
   galois::on_each(
     [&] (size_t i, size_t num_threads) {
-    unsigned chunk_size = input_rows / num_threads;
-    unsigned my_start = chunk_size * i;
-    unsigned my_end = chunk_size * (i + 1);
-    if (num_threads - 1 == i) {
-      my_end = input_rows;
-    }
-    unsigned rows_to_use = my_end - my_start;
+      if (trans_a != CblasTrans) {
+        unsigned chunk_size = input_rows / num_threads;
+        unsigned my_start = chunk_size * i;
+        unsigned my_end = chunk_size * (i + 1);
+        if (num_threads - 1 == i) {
+          my_end = input_rows;
+        }
+        unsigned rows_to_use = my_end - my_start;
 
-    const float* my_a = a + (my_start * input_columns);
-    float* my_output = output + (my_start * output_columns);
+        const float* my_a = a + (my_start * input_columns);
+        float* my_output = output + (my_start * output_columns);
 
-    // do the MM
-    cblas_sgemm(CblasRowMajor, trans_a, trans_b, rows_to_use, output_columns,
-                input_columns, 1.0, my_a, lead_dim_a, b, lead_dim_b,
-                false ? 1.0 : 0.0, my_output, output_columns);
+        // do the MM
+        cblas_sgemm(CblasRowMajor, trans_a, trans_b, rows_to_use, output_columns,
+                    input_columns, 1.0, my_a, lead_dim_a, b, lead_dim_b,
+                    false ? 1.0 : 0.0, my_output, output_columns);
+      } else {
+        galois::PODResizeableArray<float>& my_pod = temps[i];
+        my_pod.resize(input_rows * output_columns);
+
+        unsigned chunk_size = input_columns / num_threads;
+        unsigned my_start = chunk_size * i;
+        unsigned my_end = chunk_size * (i + 1);
+        if (num_threads - 1 == i) {
+          my_end = input_columns;
+        }
+        unsigned b_rows_to_use = my_end - my_start;
+
+        const float* my_a = a + (my_start * input_rows);
+        const float* my_b = b + (my_start * output_columns);
+
+        // do the MM
+        cblas_sgemm(CblasRowMajor, trans_a, trans_b, input_rows, output_columns,
+                    b_rows_to_use, 1.0, my_a, lead_dim_a, my_b, lead_dim_b,
+                    false ? 1.0 : 0.0, my_pod.data(), output_columns);
+      }
     }
   );
+
+  if (trans_a == CblasTrans) {
+    printf("Manual summation\n");
+    for (galois::PODResizeableArray<float>& temp_out : temps) {
+      for (unsigned i = 0; i < temp_out.size(); i++) {
+        output[i] += temp_out[i];
+      }
+    }
+  }
 }
 #endif
 
@@ -120,7 +155,8 @@ int main(int argc, char* argv[]) {
   std::vector<float> matrix_1(a_dim * b_dim);
   std::vector<float> matrix_2(a_dim * c_dim);
   // output
-  std::vector<float> matrix_3(a_dim * c_dim);
+  //std::vector<float> matrix_3(a_dim * c_dim);
+  std::vector<float> matrix_3(b_dim * c_dim);
 
   size_t kBigSize = 1000000000;
   std::vector<float> very_big_matrix(kBigSize);
@@ -152,7 +188,9 @@ int main(int argc, char* argv[]) {
                matrix_2.data(), matrix_3.data());
 #endif
 #if defined(USE_SHARED_GALOIS) || defined(USE_DIST_GALOIS)
-    CBlasSGEMMGalois(CblasNoTrans, CblasNoTrans, a_dim, b_dim, c_dim, matrix_1.data(),
+    //CBlasSGEMMGalois(CblasNoTrans, CblasNoTrans, a_dim, b_dim, c_dim, matrix_1.data(),
+    //           matrix_2.data(), matrix_3.data());
+    CBlasSGEMMGalois(CblasTrans, CblasNoTrans, b_dim, a_dim, c_dim, matrix_1.data(),
                matrix_2.data(), matrix_3.data());
 #endif
     //CBlasSGEMM(CblasTrans, CblasNoTrans, b_dim, a_dim, c_dim, matrix_1.data(),
