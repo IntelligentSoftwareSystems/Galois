@@ -210,6 +210,9 @@ if (GALOIS_ENABLE_GPU)
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
   endforeach()
 
+  # This is necessary to allow building for CUDA 11.x (where CUB is bundled) and earlier versions (where CUB is not included)
+  add_definitions(-DTHRUST_IGNORE_CUB_VERSION_CHECK)
+
   add_subdirectory(libgpu)
 endif()
 add_subdirectory(libpangolin)
