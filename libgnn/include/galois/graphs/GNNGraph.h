@@ -175,11 +175,7 @@ public:
   }
 
   bool IsEdgeSampledAny(EdgeIterator ei) const {
-    for (bool b : edge_sample_status_[*ei]) {
-      if (b)
-        return true;
-    }
-    return false;
+    return sampled_edges_.test(*ei);
   }
   bool IsEdgeSampled(uint32_t ei, size_t layer_num) const {
     if (!use_subgraph_) {
@@ -205,6 +201,7 @@ public:
 
   //! Set the flag on the edge to 1; makes it sampled
   void MakeEdgeSampled(EdgeIterator ei, size_t layer_num) {
+    sampled_edges_.set(*ei);
     edge_sample_status_[*ei][layer_num] = 1;
   };
   //! Set the flag on the edge to 0; makes it not sampled
@@ -224,6 +221,7 @@ public:
   //////////////////////////////////////////////////////////////////////////////
   // in edges
   //////////////////////////////////////////////////////////////////////////////
+
   EdgeIterator in_edge_begin(GraphNode n) const {
     if (!use_subgraph_ && !use_subgraph_view_) {
       return partitioned_graph_->in_edge_begin(n);
@@ -271,12 +269,7 @@ public:
   }
 
   bool IsInEdgeSampledAny(EdgeIterator ei) const {
-    for (bool b :
-         edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)]) {
-      if (b)
-        return true;
-    }
-    return false;
+    return sampled_edges_.test(partitioned_graph_->InEdgeToOutEdge(ei));
   };
   bool IsInEdgeSampled(EdgeIterator ei, size_t layer_num) const {
     if (!use_subgraph_) {
@@ -724,7 +717,7 @@ private:
   std::vector<galois::LargeArray<uint32_t>> sampled_out_degrees_;
   //! Sample data on edges: each edge gets a small bitset to mark
   //! if it's been sampled for a particular layer
-  galois::LargeArray<std::vector<bool>> edge_sample_status_;
+  galois::LargeArray<galois::gstl::Vector<bool>> edge_sample_status_;
   // TODO use a char maybe? unlikely anyone will go over 2^8 layers...
   //! What timestep a node was added to sampled set; used to determine
   //! size of subgraph at each layer
@@ -732,6 +725,8 @@ private:
   //! Indicates newly sampled nodes (for distributed synchronization of sampling
   //! status
   galois::DynamicBitSet new_sampled_nodes_;
+  //! If edge is sampled at any point, mark this
+  galois::DynamicBitSet sampled_edges_;
 
   //////////////////////////////////////////////////////////////////////////////
 

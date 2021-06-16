@@ -884,6 +884,7 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
   sample_node_timestamps_.create(partitioned_graph_->size(),
                                  std::numeric_limits<uint32_t>::max());
   edge_sample_status_.create(partitioned_graph_->sizeEdges(), num_layers, 0);
+  sampled_edges_.resize(partitioned_graph_->sizeEdges());
   // this is to hold the degree of a sampled graph considering all hosts; yes,
   // memory wise this is slightly problematic possibly, but each layer is its
   // own subgraph
@@ -929,6 +930,7 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
                    std::fill(edge_sample_status_[edge_id].begin(),
                              edge_sample_status_[edge_id].end(), 0);
                  });
+  sampled_edges_.reset();
   // reset all degrees
   if (!subgraph_choose_all_) {
     galois::do_all(
