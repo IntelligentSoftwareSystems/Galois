@@ -180,7 +180,7 @@ public:
   bool IsEdgeSampled(uint32_t ei, size_t layer_num) const {
     if (!use_subgraph_) {
       // view uses original graph edge iterators
-      return edge_sample_status_[ei][layer_num];
+      return edge_sample_status_[layer_num].test(ei);
     } else {
       return subgraph_->OutEdgeSampled(ei, layer_num, *this);
       return false;
@@ -189,24 +189,24 @@ public:
   bool IsEdgeSampled(EdgeIterator ei, size_t layer_num) const {
     if (!use_subgraph_) {
       // view uses original graph edge iterators
-      return edge_sample_status_[*ei][layer_num];
+      return edge_sample_status_[layer_num].test(*ei);
     } else {
       return subgraph_->OutEdgeSampled(ei, layer_num, *this);
     }
   };
   //! Always use original graph's edge iterator here
   bool IsEdgeSampledOriginalGraph(EdgeIterator ei, size_t layer_num) const {
-    return edge_sample_status_[*ei][layer_num];
+    return edge_sample_status_[layer_num].test(*ei);
   };
 
   //! Set the flag on the edge to 1; makes it sampled
   void MakeEdgeSampled(EdgeIterator ei, size_t layer_num) {
     sampled_edges_.set(*ei);
-    edge_sample_status_[*ei][layer_num] = 1;
+    edge_sample_status_[layer_num].set(*ei);
   };
   //! Set the flag on the edge to 0; makes it not sampled
   void MakeEdgeUnsampled(EdgeIterator ei, size_t layer_num) {
-    edge_sample_status_[*ei][layer_num] = 0;
+    edge_sample_status_[layer_num].reset(*ei, *ei);
   };
 
   // GNNEdgeSortIterator EdgeSortBegin(GraphNode n) {
@@ -274,8 +274,8 @@ public:
   bool IsInEdgeSampled(EdgeIterator ei, size_t layer_num) const {
     if (!use_subgraph_) {
       // view can use this fine + requires it
-      return edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)]
-                                [layer_num];
+      return edge_sample_status_[layer_num].test(
+          partitioned_graph_->InEdgeToOutEdge(ei));
     } else {
       return subgraph_->InEdgeSampled(ei, layer_num, *this);
     }
@@ -283,11 +283,13 @@ public:
 
   //! Set the flag on the edge to 1; makes it sampled
   void MakeInEdgeSampled(EdgeIterator ei, size_t layer_num) {
-    edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)][layer_num] = 1;
+    edge_sample_status_[layer_num].set(partitioned_graph_->InEdgeToOutEdge(ei));
   };
   //! Set the flag on the edge to 0; makes it not sampled
   void MakeInEdgeUnsampled(EdgeIterator ei, size_t layer_num) {
-    edge_sample_status_[partitioned_graph_->InEdgeToOutEdge(ei)][layer_num] = 0;
+    edge_sample_status_[layer_num].reset(
+        partitioned_graph_->InEdgeToOutEdge(ei),
+        partitioned_graph_->InEdgeToOutEdge(ei));
   };
 
   //////////////////////////////////////////////////////////////////////////////
@@ -717,7 +719,7 @@ private:
   std::vector<galois::LargeArray<uint32_t>> sampled_out_degrees_;
   //! Sample data on edges: each edge gets a small bitset to mark
   //! if it's been sampled for a particular layer
-  galois::LargeArray<galois::gstl::Vector<bool>> edge_sample_status_;
+  std::vector<galois::DynamicBitSet> edge_sample_status_;
   // TODO use a char maybe? unlikely anyone will go over 2^8 layers...
   //! What timestep a node was added to sampled set; used to determine
   //! size of subgraph at each layer

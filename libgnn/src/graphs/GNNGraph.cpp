@@ -883,7 +883,10 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
   subgraph_ = std::make_unique<GNNSubgraph>(partitioned_graph_->size());
   sample_node_timestamps_.create(partitioned_graph_->size(),
                                  std::numeric_limits<uint32_t>::max());
-  edge_sample_status_.create(partitioned_graph_->sizeEdges(), num_layers, 0);
+  edge_sample_status_.resize(num_layers);
+  for (size_t i = 0; i < num_layers; i++) {
+    edge_sample_status_[i].resize(partitioned_graph_->sizeEdges());
+  }
   sampled_edges_.resize(partitioned_graph_->sizeEdges());
   // this is to hold the degree of a sampled graph considering all hosts; yes,
   // memory wise this is slightly problematic possibly, but each layer is its
@@ -925,11 +928,10 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   std::fill(sample_node_timestamps_.begin(), sample_node_timestamps_.end(),
             std::numeric_limits<uint32_t>::max());
   // clear all sampled edges
-  galois::do_all(galois::iterate(size_t{0}, partitioned_graph_->sizeEdges()),
-                 [&](size_t edge_id) {
-                   std::fill(edge_sample_status_[edge_id].begin(),
-                             edge_sample_status_[edge_id].end(), 0);
-                 });
+  galois::do_all(
+      galois::iterate(edge_sample_status_.begin(), edge_sample_status_.end()),
+      [&](galois::DynamicBitSet& edge_layer) { edge_layer.reset(); });
+
   sampled_edges_.reset();
   // reset all degrees
   if (!subgraph_choose_all_) {
