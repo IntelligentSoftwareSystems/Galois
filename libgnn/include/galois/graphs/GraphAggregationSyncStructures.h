@@ -68,10 +68,7 @@ struct SampleFlagBitset {
 struct GNNSumAggregate {
   using ValTy = galois::gstl::Vector<GNNFloat>;
 
-  static size_t FeatVecSize() {
-    return gnn_matrix_to_sync_column_length_;
-  }
-
+  static size_t FeatVecSize() { return gnn_matrix_to_sync_column_length_; }
 
   //! return a vector of floats to sync
   static ValTy extract(uint32_t node_id, char&) {
@@ -90,10 +87,13 @@ struct GNNSumAggregate {
   }
 
   //! return a vector of floats to sync
-  static void ExtractDirect(uint32_t node_id, typename ValTy::value_type* to_write) {
-    std::memcpy(to_write,
-                (char*)&(gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_]),
-                gnn_matrix_to_sync_column_length_ * sizeof(typename ValTy::value_type));
+  static void ExtractDirect(uint32_t node_id,
+                            typename ValTy::value_type* to_write) {
+    std::memcpy(
+        to_write,
+        (char*)&(
+            gnn_matrix_to_sync_[node_id * gnn_matrix_to_sync_column_length_]),
+        gnn_matrix_to_sync_column_length_ * sizeof(typename ValTy::value_type));
   }
 
   //! reduction is addition in this case; add received vector to
@@ -166,16 +166,14 @@ struct GNNSumAggregate {
 struct GNNSampleSumAggregate {
   using ValTy = galois::gstl::Vector<GNNFloat>;
 
-  static size_t FeatVecSize() {
-    return gnn_matrix_to_sync_column_length_;
-  }
+  static size_t FeatVecSize() { return gnn_matrix_to_sync_column_length_; }
 
   //! return a vector of floats to sync
   static ValTy extract(uint32_t node_id, char&) {
     // It should be a CPU synchronizing substrate.
     // If the GPU flag is turned off, then personality does not exist.
     // assert(device_personality == DevicePersonality::CPU);
-    //ValTy extracted_vec(gnn_matrix_to_sync_column_length_);
+    // ValTy extracted_vec(gnn_matrix_to_sync_column_length_);
     ValTy extracted_vec;
     extracted_vec.reserve(gnn_matrix_to_sync_column_length_);
     if ((*gnn_lid_to_sid_pointer_)[node_id] ==
@@ -194,14 +192,17 @@ struct GNNSampleSumAggregate {
     return extracted_vec;
   }
 
-  static void ExtractDirect(uint32_t node_id, typename ValTy::value_type* to_write) {
+  static void ExtractDirect(uint32_t node_id,
+                            typename ValTy::value_type* to_write) {
     if ((*gnn_lid_to_sid_pointer_)[node_id] ==
         std::numeric_limits<uint32_t>::max()) {
       return;
     }
-    std::memcpy(to_write,
-                (char*)&(gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id]* gnn_matrix_to_sync_column_length_]),
-                gnn_matrix_to_sync_column_length_ * sizeof(typename ValTy::value_type));
+    std::memcpy(
+        to_write,
+        (char*)&(gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id] *
+                                     gnn_matrix_to_sync_column_length_]),
+        gnn_matrix_to_sync_column_length_ * sizeof(typename ValTy::value_type));
   }
 
   //! reduction is addition in this case; add received vector to

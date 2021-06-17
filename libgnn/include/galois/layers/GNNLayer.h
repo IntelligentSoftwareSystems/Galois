@@ -364,12 +364,17 @@ protected:
     MaskInputNonMasters(input, std::numeric_limits<size_t>::max());
   }
   void MaskInputNonMasters(PointerWithSize<GNNFloat>* input, size_t max_rows);
+  void MaskInputNonMasters(PointerWithSize<GNNFloat>* input, size_t max_rows,
+                           const galois::DynamicBitSet&);
+
   //! Mask a gradient size'd matrix's rows that correspond to mirrors
   void MaskGradientNonMasters(PointerWithSize<GNNFloat>* input) {
     MaskGradientNonMasters(input, std::numeric_limits<size_t>::max());
   }
   void MaskGradientNonMasters(PointerWithSize<GNNFloat>* gradients,
                               size_t max_rows);
+  void MaskGradientNonMasters(PointerWithSize<GNNFloat>* gradients,
+                              size_t max_rows, const galois::DynamicBitSet&);
 
   //! Does some math to get GB used by some # of floats
   double FloatElementsToGB(size_t num_of_floats) const {

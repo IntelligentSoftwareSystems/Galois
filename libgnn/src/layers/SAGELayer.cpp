@@ -206,7 +206,7 @@ void galois::SAGELayer::ResizeIntermediates(size_t new_input_rows,
       galois::gInfo(graph_.host_prefix(), "Resize layer ", layer_number_,
                     ", SAGE output temp var ", num_output_temp_elements, " (",
                     FloatElementsToGB(num_output_temp_elements), " GB)");
-       size_t buffer_size = (num_output_temp_elements * 0.02);
+      size_t buffer_size = (num_output_temp_elements * 0.02);
 #ifdef GALOIS_ENABLE_GPU
       if (device_personality == DevicePersonality::GPU_CUDA) {
         gpu_object_.AllocateOutTemp(num_output_temp_elements + buffer_size);
@@ -370,11 +370,21 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
   if (!sage_config_.disable_concat) {
     // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0) {
-      MaskInputNonMasters(&input_data, layer_dimensions_.input_rows);
+      if (graph_.IsSubgraphOn()) {
+        MaskInputNonMasters(&input_data, layer_dimensions_.input_rows,
+                            graph_.GetNonLayerZeroMasters());
+      } else {
+        MaskInputNonMasters(&input_data, layer_dimensions_.input_rows);
+      }
     } else {
       // if 0 then no input to mask: mask the gradient
       // this is fine because gradient won't be used to get feature gradients
-      MaskGradientNonMasters(input_gradient, layer_dimensions_.output_rows);
+      if (graph_.IsSubgraphOn()) {
+        MaskGradientNonMasters(input_gradient, layer_dimensions_.output_rows,
+                               graph_.GetNonLayerZeroMasters());
+      } else {
+        MaskGradientNonMasters(input_gradient, layer_dimensions_.output_rows);
+      }
     }
 
 #ifdef GALOIS_ENABLE_GPU
@@ -411,7 +421,12 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     // mask it, then use it
     // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0 || sage_config_.disable_concat) {
-      MaskInputNonMasters(&agg_data, layer_dimensions_.output_rows);
+      if (graph_.IsSubgraphOn()) {
+        MaskInputNonMasters(&agg_data, layer_dimensions_.output_rows,
+                            graph_.GetNonLayerZeroMasters());
+      } else {
+        MaskInputNonMasters(&agg_data, layer_dimensions_.output_rows);
+      }
     }
     // if concat is disabled, then input grad isn't masked; therefore, mask
     // this to get the same effect
@@ -460,11 +475,21 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     // disable concat part is here because otherwise it would get done elsewhere
     // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0 && sage_config_.disable_concat) {
-      MaskInputNonMasters(&input_data, layer_dimensions_.input_rows);
+      if (graph_.IsSubgraphOn()) {
+        MaskInputNonMasters(&input_data, layer_dimensions_.input_rows,
+                            graph_.GetNonLayerZeroMasters());
+      } else {
+        MaskInputNonMasters(&input_data, layer_dimensions_.input_rows);
+      }
     } else {
       // if 0 then no input to mask: mask the gradient
       // this is fine because gradient won't be used to get feature gradients
-      MaskGradientNonMasters(&p_out_temp_, layer_dimensions_.input_rows);
+      if (graph_.IsSubgraphOn()) {
+        MaskGradientNonMasters(&p_out_temp_, layer_dimensions_.input_rows,
+                               graph_.GetNonLayerZeroMasters());
+      } else {
+        MaskGradientNonMasters(&p_out_temp_, layer_dimensions_.input_rows);
+      }
     }
 
     // W' = F^T (FW)'

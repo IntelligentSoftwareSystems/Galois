@@ -634,6 +634,16 @@ public:
   void DisableSubgraphChooseAll() { subgraph_choose_all_ = false; }
   void SetSubgraphChooseAll(bool a) { subgraph_choose_all_ = a; }
 
+  std::vector<unsigned>& GetMasterOffsets() { return sample_master_offsets_; }
+  std::vector<unsigned>& GetMirrorOffsets() { return sample_mirror_offsets_; }
+
+  galois::DynamicBitSet& GetNonLayerZeroMasters() {
+    return non_layer_zero_masters_;
+  }
+  const galois::DynamicBitSet& GetNonLayerZeroMasters() const {
+    return non_layer_zero_masters_;
+  }
+
 private:
 // included like this to avoid cyclic dependency issues + not used anywhere but
 // in this class anyways
@@ -724,6 +734,17 @@ private:
   //! What timestep a node was added to sampled set; used to determine
   //! size of subgraph at each layer
   galois::LargeArray<unsigned> sample_node_timestamps_;
+  //! Count of how many masters are in each layer in a sampled subgraph.
+  std::vector<unsigned> sample_master_offsets_;
+  //! Count of how many mirrors are in each layer in a sampled subgraph.
+  std::vector<unsigned> sample_mirror_offsets_;
+  //! In a subgraph, all layer 0 masters are made the prefix of SIDs; other
+  //! masters that are not layer 0 will be scattered elsewhere. This bitset
+  //! tracks which of those SIDs are the masters.
+  //! This is required for master masking in certain layers in distributed
+  //! execution to avoid recomputation of certain gradients.
+  galois::DynamicBitSet non_layer_zero_masters_;
+
   //! Indicates newly sampled nodes (for distributed synchronization of sampling
   //! status
   galois::DynamicBitSet new_sampled_nodes_;
@@ -768,7 +789,6 @@ private:
   std::vector<uint32_t> global_degrees_;
   std::vector<uint32_t> global_train_degrees_;
 
-  // TODO vars for subgraphs as necessary
   bool use_subgraph_{false};
   bool use_subgraph_view_{false};
   bool subgraph_choose_all_{false};

@@ -111,10 +111,10 @@ private:
       t->stop();
   }
 
+  // TODO signature cleanup
   //! Creates subgraph ID mapping from the number of sampled nodes from the
   //! original graph. Should be done every epoch when sampled graph changes.
-  void CreateSubgraphMapping(const GNNGraph& gnn_graph,
-                             size_t num_sampled_layers);
+  void CreateSubgraphMapping(GNNGraph& gnn_graph, size_t);
 
   //! Counts in and out degrees of all sampled nodes in the graph
   void DegreeCounting(const GNNGraph& gnn_graph);

@@ -28,8 +28,9 @@ size_t galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraphView(
   return num_subgraph_nodes_;
 }
 
+// TODO signature cleanup
 void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
-    const GNNGraph& gnn_graph, size_t num_sampled_layers) {
+    GNNGraph& gnn_graph, size_t) {
   galois::StatTimer timer("SIDMapping", kRegionName);
   TimerStart(&timer);
 
@@ -51,60 +52,73 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
     subgraph_id_to_lid_.resize(num_subgraph_nodes_ * 1.02);
   }
 
-  // TODO(loc) depending on overhead, can parallelize this with a prefix sum
-  // serial loop over LIDs to construct lid -> subgraph id mapping
-  uint32_t current_sid = 0;
+  galois::DynamicBitSet& non_layer_zero_masters =
+      gnn_graph.GetNonLayerZeroMasters();
+  std::vector<unsigned>& master_offsets = gnn_graph.GetMasterOffsets();
+  std::vector<unsigned>& mirror_offsets = gnn_graph.GetMirrorOffsets();
 
-  // split into 2 parts: masters, then mirrors
+  // init the bitset as necessary
+  if (non_layer_zero_masters.size() < num_subgraph_nodes_) {
+    non_layer_zero_masters.resize(num_subgraph_nodes_);
+  } else {
+    non_layer_zero_masters.reset();
+  }
+
+  // compute offsets for each layer
+  uint32_t layer_zero_offset = 0;
+  galois::PODResizeableArray<unsigned> layer_offsets;
+  layer_offsets.resize(master_offsets.size() - 1);
+  for (unsigned i = 0; i < layer_offsets.size(); i++) {
+    layer_offsets[i] = master_offsets[i] + mirror_offsets[i];
+    if (i > 0) {
+      // prefix summing
+      layer_offsets[i] += layer_offsets[i - 1];
+    }
+  }
+
+  // split into 2 parts: masters, then everything else
   size_t last_owned_node = *(gnn_graph.end_owned());
+  galois::gInfo(last_owned_node);
   for (size_t local_node_id = 0; local_node_id < last_owned_node;
        local_node_id++) {
-    if (gnn_graph.SampleNodeTimestamp(local_node_id) == 0) {
-      // TODO should bound check the SID to max uint32_t
-      // note: if SID is max uint32t, then it's not valid
-      subgraph_id_to_lid_[current_sid]   = local_node_id;
-      lid_to_subgraph_id_[local_node_id] = current_sid++;
+    unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
+    if (node_timestamp != std::numeric_limits<unsigned>::max()) {
+      uint32_t sid_to_use;
+      if (node_timestamp != 0) {
+        sid_to_use = layer_offsets[node_timestamp - 1]++;
+        // master that won't be in prefix needs to be marked
+        non_layer_zero_masters.set(sid_to_use);
+      } else {
+        sid_to_use = layer_zero_offset++;
+      }
+      subgraph_id_to_lid_[sid_to_use]    = local_node_id;
+      lid_to_subgraph_id_[local_node_id] = sid_to_use++;
     }
   }
 
-  // all nodes before this SID are master nodes *that matter*
-  // NOTE: there is a very subtle distinction here implementation wise
-  // that needs to be resolved in slightly more detail than this;
-  // there may be master nodes that are past this boundary that will
-  // not be covered by this begin_owned loop, which may cause problems down
+  // all nodes before this SID are master nodes in layer 0;
+  // NOTE: there are master nodes past this boundary that will
+  // not be covered by a begin_owned loop, which may cause problems down
   // the line
-  // TODO(loc) see above
-  subgraph_master_boundary_ = current_sid;
+  subgraph_master_boundary_ = master_offsets[0];
 
+  // everything else; none of these are master nodes
   for (size_t local_node_id = last_owned_node; local_node_id < gnn_graph.size();
        local_node_id++) {
-    if (gnn_graph.SampleNodeTimestamp(local_node_id) == 0) {
-      // TODO should bound check the SID to max uint32_t
-      // note: if SID is max uint32t, then it's not valid
-      subgraph_id_to_lid_[current_sid]   = local_node_id;
-      lid_to_subgraph_id_[local_node_id] = current_sid++;
-    }
-  }
-  galois::gDebug(
-      "Number of sampled nodes for subgraph construction layer 0 is ",
-      current_sid);
-
-  // XXX each sampled layer can be queried in parallel (think prefix sum); do
-  // this if this becomes a bottleneck
-  for (size_t i = 1; i < num_sampled_layers + 1; i++) {
-    for (size_t local_node_id = 0; local_node_id < gnn_graph.size();
-         local_node_id++) {
-      if (gnn_graph.SampleNodeTimestamp(local_node_id) == i) {
-        subgraph_id_to_lid_[current_sid]   = local_node_id;
-        lid_to_subgraph_id_[local_node_id] = current_sid++;
+    unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
+    if (node_timestamp != std::numeric_limits<unsigned>::max()) {
+      uint32_t sid_to_use;
+      if (node_timestamp != 0) {
+        sid_to_use = layer_offsets[node_timestamp - 1]++;
+      } else {
+        sid_to_use = layer_zero_offset++;
       }
+      subgraph_id_to_lid_[sid_to_use]    = local_node_id;
+      lid_to_subgraph_id_[local_node_id] = sid_to_use++;
     }
-    galois::gDebug("Number of sampled nodes for subgraph construction, layer ",
-                   i, " is ", current_sid);
   }
 
-  GALOIS_LOG_ASSERT(num_subgraph_nodes_ == current_sid);
-  // num_subgraph_nodes_ = current_sid;
+  GALOIS_LOG_ASSERT(layer_offsets.back() == num_subgraph_nodes_);
   TimerStop(&timer);
 }
 
@@ -141,8 +155,6 @@ void galois::graphs::GNNGraph::GNNSubgraph::DegreeCounting(
           }
         }
         local_subgraph_in_degrees_[subgraph_id] = in_degrees;
-        // galois::gDebug("Local ID ", node_id, " SID ", subgraph_id, " out ",
-        //               out_degrees, " in ", in_degrees);
       },
       galois::loopname("DegreeCountingDoAll"), galois::steal());
 
@@ -231,7 +243,6 @@ void galois::graphs::GNNGraph::GNNSubgraph::NodeFeatureCreation(
   galois::StatTimer timer("NodeFeatureCreation", kRegionName);
   TimerStart(&timer);
   size_t feat_length = gnn_graph.node_feature_length();
-  // assumes everything is already setup
   subgraph_node_features_.resize(feat_length * num_subgraph_nodes_);
 
   galois::do_all(galois::iterate(begin(), end()), [&](size_t subgraph_node_id) {

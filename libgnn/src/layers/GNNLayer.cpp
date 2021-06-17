@@ -423,6 +423,45 @@ void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input,
 #endif
 }
 
+void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input,
+                                           size_t max_rows,
+                                           const galois::DynamicBitSet& bs) {
+  assert(*(graph_.begin_owned()) == 0);
+  size_t start_node = *(graph_.end_owned());
+  size_t end_node   = graph_.active_size();
+
+  if (start_node > max_rows) {
+    start_node = max_rows;
+  }
+  if (end_node > max_rows) {
+    end_node = max_rows;
+  }
+
+  size_t row_index = layer_dimensions_.input_columns;
+  assert(start_node * row_index <= input->size());
+  assert(end_node * row_index <= input->size());
+
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    base_gpu_object_.MaskNonMastersGPU(input, start_node, end_node, row_index);
+  } else {
+#endif
+    galois::do_all(
+        galois::iterate(start_node, end_node),
+        [&](size_t non_master) {
+          if (!bs.test(non_master)) {
+            // TODO(loc) use a std function for this for max efficiency
+            for (size_t i = 0; i < row_index; i++) {
+              (*input)[non_master * row_index + i] = 0;
+            }
+          }
+        },
+        galois::loopname("MaskInputNonMasters"));
+#ifdef GALOIS_ENABLE_GPU
+  }
+#endif
+}
+
 void galois::GNNLayer::MaskGradientNonMasters(
     PointerWithSize<GNNFloat>* gradient, size_t max_rows) {
   assert(*(graph_.begin_owned()) == 0);
@@ -458,6 +497,55 @@ void galois::GNNLayer::MaskGradientNonMasters(
           // TODO(loc) use a std function for this for max efficiency
           for (size_t i = 0; i < row_index; i++) {
             (*gradient)[non_master * row_index + i] = 0;
+          }
+        },
+        galois::loopname("MaskGradientNonMasters"));
+#ifdef GALOIS_ENABLE_GPU
+  }
+#endif
+}
+
+void galois::GNNLayer::MaskGradientNonMasters(
+    PointerWithSize<GNNFloat>* gradient, size_t max_rows,
+    const galois::DynamicBitSet& bs) {
+  assert(*(graph_.begin_owned()) == 0);
+  size_t start_node = *(graph_.end_owned());
+  size_t end_node   = graph_.active_size();
+
+  if (start_node > max_rows) {
+    start_node = max_rows;
+  }
+  if (end_node > max_rows) {
+    end_node = max_rows;
+  }
+
+  size_t row_index = layer_dimensions_.output_columns;
+  if (start_node > max_rows) {
+    start_node = max_rows;
+  }
+  if (end_node > max_rows) {
+    end_node = max_rows;
+  }
+  assert(start_node * row_index <= gradient->size());
+  assert(end_node * row_index <= gradient->size());
+
+#ifdef GALOIS_ENABLE_GPU
+  if (device_personality == DevicePersonality::GPU_CUDA) {
+    base_gpu_object_.MaskNonMastersGPU(gradient, start_node, end_node,
+                                       row_index);
+  } else {
+#endif
+    // galois::gInfo(start_node, " to ", end_node);
+    galois::do_all(
+        galois::iterate(start_node, end_node),
+        [&](size_t non_master) {
+          // if something is not a master, kill it
+          if (!bs.test(non_master)) {
+            // galois::gInfo("don't keep ", non_master);
+            // TODO(loc) use a std function for this for max efficiency
+            for (size_t i = 0; i < row_index; i++) {
+              (*gradient)[non_master * row_index + i] = 0;
+            }
           }
         },
         galois::loopname("MaskGradientNonMasters"));

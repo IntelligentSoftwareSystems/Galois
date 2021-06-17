@@ -62,7 +62,7 @@ struct SubgraphDegreeSync {
   using ValTy = galois::gstl::Vector<uint32_t>;
 
   static size_t FeatVecSize() {
-    return gnn_sampled_out_degrees_->size();;
+    return gnn_sampled_out_degrees_->size();
   }
 
   static ValTy extract(uint32_t lid, char&) {
@@ -76,12 +76,12 @@ struct SubgraphDegreeSync {
     return vec_to_send;
   }
 
-  static void ExtractDirect(uint32_t lid, typename ValTy::value_type* to_write) {
+  static void ExtractDirect(uint32_t lid,
+                            typename ValTy::value_type* to_write) {
     size_t count = 0;
     for (galois::LargeArray<uint32_t>& layer_degrees :
          *gnn_sampled_out_degrees_) {
-      std::memcpy(&to_write[count],
-                  &layer_degrees[lid],
+      std::memcpy(&to_write[count], &layer_degrees[lid],
                   sizeof(typename ValTy::value_type));
       count++;
     }
@@ -96,7 +96,8 @@ struct SubgraphDegreeSync {
   }
 
   static bool reduce(uint32_t lid, char&, ValTy::value_type* y) {
-    for (size_t degree_index = 0; degree_index < gnn_sampled_out_degrees_->size(); degree_index++) {
+    for (size_t degree_index = 0;
+         degree_index < gnn_sampled_out_degrees_->size(); degree_index++) {
       (*gnn_sampled_out_degrees_)[degree_index][lid] += y[degree_index];
     }
     return true;
@@ -119,11 +120,11 @@ struct SubgraphDegreeSync {
   }
 
   static void setVal(uint32_t lid, char&, ValTy::value_type* y) {
-    for (size_t degree_index = 0; degree_index < gnn_sampled_out_degrees_->size(); degree_index++) {
+    for (size_t degree_index = 0;
+         degree_index < gnn_sampled_out_degrees_->size(); degree_index++) {
       (*gnn_sampled_out_degrees_)[degree_index][lid] = y[degree_index];
     }
   }
-
 
   // GPU options TODO for GPU
   static bool extract_batch(unsigned, uint8_t*, size_t*, DataCommMode*) {
