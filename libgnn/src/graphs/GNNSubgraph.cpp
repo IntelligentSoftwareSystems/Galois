@@ -183,8 +183,27 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
   underlying_graph_.CSCAllocate();
   TimerStop(&alloc_time);
 
+  galois::gInfo("subgraph nodes and edges are ", num_subgraph_nodes_, " ", num_subgraph_edges_);
+
+  galois::DGAccumulator<uint32_t> empty_masters;
+  galois::DGAccumulator<uint32_t> empty_mirrors;
+  empty_masters.reset();
+  empty_mirrors.reset();
+
   galois::do_all(galois::iterate(uint32_t{0}, num_subgraph_nodes_),
                  [&](uint32_t subgraph_id) {
+                   if (local_subgraph_out_degrees_[subgraph_id] == 0 &&
+                       local_subgraph_in_degrees_[subgraph_id] == 0) {
+                     if (subgraph_id < subgraph_master_boundary_) {
+                       empty_masters += 1;
+                     } else {
+                       if (gnn_graph.GetNonLayerZeroMasters().test(subgraph_id)) {
+                         empty_masters += 1;
+                       } else {
+                         empty_mirrors += 1;
+                       }
+                     }
+                   }
                    underlying_graph_.fixEndEdge(
                        subgraph_id, local_subgraph_out_degrees_[subgraph_id]);
                    underlying_graph_.FixEndInEdge(
@@ -196,6 +215,10 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
   if (in_subedge_to_original_edge_.size() < num_subgraph_edges_) {
     in_subedge_to_original_edge_.resize(num_subgraph_edges_ * 1.02);
   }
+  uint32_t emaster = empty_masters.reduce();
+  uint32_t emirror = empty_mirrors.reduce();
+  galois::gInfo("empty masters percent is ", emaster / (float)num_subgraph_nodes_, " ", emaster);
+  galois::gInfo("empty mirrors percent is ", emirror / (float)num_subgraph_nodes_, " ", emirror);
 
   // save edges + save reference to layer sample status
   galois::do_all(
