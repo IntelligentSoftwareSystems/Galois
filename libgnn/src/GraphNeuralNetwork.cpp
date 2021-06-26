@@ -440,6 +440,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
           DisableTimers();
           float test_acc;
           if (!config_.test_minibatch_size()) {
+            // TODO something about this path breaks accuracy
+            GALOIS_LOG_FATAL("this path breaks accuracy for the rest of the "
+                             "run for some reason");
             bool f = graph_->SubgraphChooseAllStatus();
             graph_->DisableSubgraph();
             for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
