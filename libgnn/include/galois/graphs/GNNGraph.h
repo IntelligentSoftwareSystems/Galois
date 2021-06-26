@@ -309,11 +309,12 @@ public:
   size_t SampleEdges(size_t sample_layer_num, size_t num_to_sample,
                      bool inductive_subgraph, size_t timestamp);
 
-  size_t ConstructSampledSubgraph(size_t num_sampled_layers) {
+  std::vector<unsigned> ConstructSampledSubgraph(size_t num_sampled_layers) {
     return ConstructSampledSubgraph(num_sampled_layers, false);
   };
   //! Construct the subgraph from sampled edges and corresponding nodes
-  size_t ConstructSampledSubgraph(size_t num_sampled_layers, bool use_view);
+  std::vector<unsigned> ConstructSampledSubgraph(size_t num_sampled_layers,
+                                                 bool use_view);
 
   unsigned SampleNodeTimestamp(unsigned lid) const {
     return sample_node_timestamps_[lid];
@@ -590,6 +591,10 @@ public:
     }
   }
 
+  bool IsActiveInSubgraph(size_t node_id) const {
+    return definitely_sampled_nodes_.test(node_id);
+  }
+
   //! Calculate norm factor considering the entire graph
   void CalculateFullNormFactor();
 
@@ -738,6 +743,11 @@ private:
   std::vector<unsigned> sample_master_offsets_;
   //! Count of how many mirrors are in each layer in a sampled subgraph.
   std::vector<unsigned> sample_mirror_offsets_;
+  //! Definitely sampled nodes
+  galois::DynamicBitSet definitely_sampled_nodes_;
+
+  std::vector<galois::GAccumulator<uint32_t>> master_offset_accum_;
+  std::vector<galois::GAccumulator<uint32_t>> mirror_offset_accum_;
   //! In a subgraph, all layer 0 masters are made the prefix of SIDs; other
   //! masters that are not layer 0 will be scattered elsewhere. This bitset
   //! tracks which of those SIDs are the masters.

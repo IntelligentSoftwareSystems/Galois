@@ -899,7 +899,9 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
   } else {
     subgraph_choose_all_ = true;
   }
-
+  definitely_sampled_nodes_.resize(partitioned_graph_->size());
+  master_offset_accum_.resize(num_layers + 1);
+  mirror_offset_accum_.resize(num_layers + 1);
   sample_master_offsets_.resize(num_layers + 1, 0);
   sample_mirror_offsets_.resize(num_layers + 1, 0);
 }
@@ -910,12 +912,14 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
 
   bitset_sample_flag_.resize(size());
   bitset_sample_flag_.reset();
+  definitely_sampled_nodes_.reset();
 
   galois::do_all(galois::iterate(begin_owned(), end_owned()),
                  [&](const NodeIterator& x) {
                    if (IsValidForPhase(*x, seed_phase)) {
                      SetSampledNode(*x);
                      bitset_sample_flag_.set(*x);
+                     definitely_sampled_nodes_.set(*x);
                    } else {
                      UnsetSampledNode(*x);
                    }
@@ -932,6 +936,11 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
             std::numeric_limits<uint32_t>::max());
   std::fill(sample_master_offsets_.begin(), sample_master_offsets_.end(), 0);
   std::fill(sample_mirror_offsets_.begin(), sample_mirror_offsets_.end(), 0);
+
+  for (unsigned i = 0; i < master_offset_accum_.size(); i++) {
+    master_offset_accum_[i].reset();
+    mirror_offset_accum_[i].reset();
+  }
 
   // clear all sampled edges
   galois::do_all(
@@ -996,11 +1005,6 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
   use_subgraph_      = false;
   use_subgraph_view_ = false;
 
-  // galois::GAccumulator<size_t> sampled;
-  // galois::GAccumulator<size_t> total;
-  // sampled.reset();
-  // total.reset();
-
   galois::do_all(
       galois::iterate(begin(), end()),
       [&](const NodeIterator& src_iter) {
@@ -1019,11 +1023,12 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
             }
 
             MakeEdgeSampled(edge_iter, agg_layer_num);
-            if (!IsInSampledGraph(partitioned_graph_->getEdgeDst(edge_iter))) {
-              bitset_sample_flag_.set(
-                  partitioned_graph_->getEdgeDst(edge_iter));
+            uint32_t dest = partitioned_graph_->getEdgeDst(edge_iter);
+            if (!IsInSampledGraph(dest)) {
+              bitset_sample_flag_.set(dest);
             }
-            // sampled += 1;
+            definitely_sampled_nodes_.set(*src_iter);
+            definitely_sampled_nodes_.set(dest);
           }
         }
       },
@@ -1056,29 +1061,15 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
 
   galois::GAccumulator<unsigned> local_sample_count;
   local_sample_count.reset();
-  galois::GAccumulator<unsigned> master_offset;
-  master_offset.reset();
-  galois::GAccumulator<unsigned> mirror_offset;
-  mirror_offset.reset();
   // count # of seed nodes
   galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
     if (IsInSampledGraph(x)) {
       local_sample_count += 1;
       if (sample_node_timestamps_[*x] == std::numeric_limits<uint32_t>::max()) {
-        if (*x < *end_owned()) {
-          master_offset += 1;
-        } else {
-          // mirror
-          mirror_offset += 1;
-        }
         sample_node_timestamps_[*x] = timestamp;
       }
     }
   });
-  assert(sample_master_offsets_.size() > timestamp);
-  assert(sample_mirror_offsets_.size() > timestamp);
-  sample_master_offsets_[timestamp] = master_offset.reduce();
-  sample_mirror_offsets_[timestamp] = mirror_offset.reduce();
 
   EnableSubgraphChooseAll();
   return local_sample_count.reduce();
@@ -1121,15 +1112,16 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
                 }
               }
 
+              uint32_t edge_dst = partitioned_graph_->getEdgeDst(edge_iter);
               // if here, it means edge accepted; set sampled on, mark
               // as part of next set
               MakeEdgeSampled(edge_iter, sample_layer_num);
-              if (!IsInSampledGraph(
-                      partitioned_graph_->getEdgeDst(edge_iter))) {
-                bitset_sample_flag_.set(
-                    partitioned_graph_->getEdgeDst(edge_iter));
+              if (!IsInSampledGraph(edge_dst)) {
+                bitset_sample_flag_.set(edge_dst);
               }
               bitset_sampled_degrees_.set(*src_iter);
+              definitely_sampled_nodes_.set(*src_iter);
+              definitely_sampled_nodes_.set(edge_dst);
               // degree increment
               sampled_out_degrees_[sample_layer_num][*src_iter]++;
             }
@@ -1165,37 +1157,22 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
   // count sampled node size
   galois::GAccumulator<unsigned> local_sample_count;
   local_sample_count.reset();
-  galois::GAccumulator<unsigned> master_offset;
-  master_offset.reset();
-  galois::GAccumulator<unsigned> mirror_offset;
-  mirror_offset.reset();
   // count # of seed nodes
   galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
     if (IsInSampledGraph(x)) {
-
       local_sample_count += 1;
       if (sample_node_timestamps_[*x] == std::numeric_limits<uint32_t>::max()) {
-        if (*x < *end_owned()) {
-          master_offset += 1;
-        } else {
-          // mirror
-          mirror_offset += 1;
-        }
         sample_node_timestamps_[*x] = timestamp;
       }
     }
   });
-  assert(sample_master_offsets_.size() > timestamp);
-  assert(sample_mirror_offsets_.size() > timestamp);
-  sample_master_offsets_[timestamp] = master_offset.reduce();
-  sample_mirror_offsets_[timestamp] = mirror_offset.reduce();
 
   DisableSubgraphChooseAll();
   return local_sample_count.reduce();
 }
 
 //! Construct the subgraph from sampled edges and corresponding nodes
-size_t
+std::vector<unsigned>
 galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
                                                    bool use_view) {
   // false first so that the build process can use functions to access the
@@ -1215,13 +1192,36 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
         ->sync<writeSource, readAny, SubgraphDegreeSync, SubgraphDegreeBitset>(
             "Ignore");
   }
-  size_t num_subgraph_nodes;
+
+  galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
+    if (IsActiveInSubgraph(*x)) {
+      if (sample_node_timestamps_[*x] != std::numeric_limits<uint32_t>::max()) {
+        if (*x < *end_owned()) {
+          // master
+          master_offset_accum_[sample_node_timestamps_[*x]] += 1;
+        } else {
+          // mirror
+          mirror_offset_accum_[sample_node_timestamps_[*x]] += 1;
+        }
+      } else {
+        GALOIS_LOG_FATAL(
+            "should have been timestamped at some point if active");
+      }
+    }
+  });
+
+  std::vector<unsigned> new_rows(master_offset_accum_.size());
+  for (unsigned i = 0; i < master_offset_accum_.size(); i++) {
+    sample_master_offsets_[i] = master_offset_accum_[i].reduce();
+    sample_mirror_offsets_[i] = mirror_offset_accum_[i].reduce();
+    new_rows[i] = sample_master_offsets_[i] + sample_mirror_offsets_[i];
+  }
+
   if (!use_view) {
-    num_subgraph_nodes = subgraph_->BuildSubgraph(*this, num_sampled_layers);
+    subgraph_->BuildSubgraph(*this, num_sampled_layers);
   } else {
     // a view only has lid<->sid mappings
-    num_subgraph_nodes =
-        subgraph_->BuildSubgraphView(*this, num_sampled_layers);
+    subgraph_->BuildSubgraphView(*this, num_sampled_layers);
   }
 
   // after this, this graph is a subgraph
@@ -1231,7 +1231,7 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
     use_subgraph_view_ = true;
   }
 
-  return num_subgraph_nodes;
+  return new_rows;
 }
 
 size_t galois::graphs::GNNGraph::PrepareNextTrainMinibatch() {

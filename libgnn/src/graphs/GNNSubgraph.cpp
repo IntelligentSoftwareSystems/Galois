@@ -39,11 +39,15 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
   std::fill(lid_to_subgraph_id_.begin(), lid_to_subgraph_id_.end(),
             std::numeric_limits<uint32_t>::max());
 
+  std::vector<unsigned>& master_offsets = gnn_graph.GetMasterOffsets();
+  std::vector<unsigned>& mirror_offsets = gnn_graph.GetMirrorOffsets();
+
   galois::GAccumulator<uint32_t> subgraph_count;
   subgraph_count.reset();
   galois::do_all(galois::iterate(gnn_graph.begin(), gnn_graph.end()),
                  [&](uint32_t node_id) {
-                   if (gnn_graph.IsInSampledGraph(node_id)) {
+                   // if (gnn_graph.IsInSampledGraph(node_id)) {
+                   if (gnn_graph.IsActiveInSubgraph(node_id)) {
                      subgraph_count += 1;
                    }
                  });
@@ -54,9 +58,6 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
 
   galois::DynamicBitSet& non_layer_zero_masters =
       gnn_graph.GetNonLayerZeroMasters();
-  std::vector<unsigned>& master_offsets = gnn_graph.GetMasterOffsets();
-  std::vector<unsigned>& mirror_offsets = gnn_graph.GetMirrorOffsets();
-
   // init the bitset as necessary
   if (non_layer_zero_masters.size() < num_subgraph_nodes_) {
     non_layer_zero_masters.resize(num_subgraph_nodes_);
@@ -78,21 +79,22 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
 
   // split into 2 parts: masters, then everything else
   size_t last_owned_node = *(gnn_graph.end_owned());
-  galois::gInfo(last_owned_node);
   for (size_t local_node_id = 0; local_node_id < last_owned_node;
        local_node_id++) {
-    unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
-    if (node_timestamp != std::numeric_limits<unsigned>::max()) {
-      uint32_t sid_to_use;
-      if (node_timestamp != 0) {
-        sid_to_use = layer_offsets[node_timestamp - 1]++;
-        // master that won't be in prefix needs to be marked
-        non_layer_zero_masters.set(sid_to_use);
-      } else {
-        sid_to_use = layer_zero_offset++;
+    if (gnn_graph.IsActiveInSubgraph(local_node_id)) {
+      unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
+      if (node_timestamp != std::numeric_limits<unsigned>::max()) {
+        uint32_t sid_to_use;
+        if (node_timestamp != 0) {
+          sid_to_use = layer_offsets[node_timestamp - 1]++;
+          // master that won't be in prefix needs to be marked
+          non_layer_zero_masters.set(sid_to_use);
+        } else {
+          sid_to_use = layer_zero_offset++;
+        }
+        subgraph_id_to_lid_[sid_to_use]    = local_node_id;
+        lid_to_subgraph_id_[local_node_id] = sid_to_use++;
       }
-      subgraph_id_to_lid_[sid_to_use]    = local_node_id;
-      lid_to_subgraph_id_[local_node_id] = sid_to_use++;
     }
   }
 
@@ -105,16 +107,18 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
   // everything else; none of these are master nodes
   for (size_t local_node_id = last_owned_node; local_node_id < gnn_graph.size();
        local_node_id++) {
-    unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
-    if (node_timestamp != std::numeric_limits<unsigned>::max()) {
-      uint32_t sid_to_use;
-      if (node_timestamp != 0) {
-        sid_to_use = layer_offsets[node_timestamp - 1]++;
-      } else {
-        sid_to_use = layer_zero_offset++;
+    if (gnn_graph.IsActiveInSubgraph(local_node_id)) {
+      unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
+      if (node_timestamp != std::numeric_limits<unsigned>::max()) {
+        uint32_t sid_to_use;
+        if (node_timestamp != 0) {
+          sid_to_use = layer_offsets[node_timestamp - 1]++;
+        } else {
+          sid_to_use = layer_zero_offset++;
+        }
+        subgraph_id_to_lid_[sid_to_use]    = local_node_id;
+        lid_to_subgraph_id_[local_node_id] = sid_to_use++;
       }
-      subgraph_id_to_lid_[sid_to_use]    = local_node_id;
-      lid_to_subgraph_id_[local_node_id] = sid_to_use++;
     }
   }
 
@@ -166,43 +170,44 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
     const GNNGraph& gnn_graph) {
   galois::StatTimer timer("EdgeConstruction", kRegionName);
   TimerStart(&timer);
-  galois::DGAccumulator<uint32_t> empty_masters;
-  galois::DGAccumulator<uint32_t> empty_mirrors;
-  empty_masters.reset();
-  empty_mirrors.reset();
+  // galois::DGAccumulator<uint32_t> empty_masters;
+  // galois::DGAccumulator<uint32_t> empty_mirrors;
+  // empty_masters.reset();
+  // empty_mirrors.reset();
 
-  galois::DGAccumulator<uint32_t> total_sn;
-  total_sn.reset();
-  total_sn += num_subgraph_nodes_;
-  size_t global_sub_size = total_sn.reduce();
+  // galois::DGAccumulator<uint32_t> total_sn;
+  // total_sn.reset();
+  // total_sn += num_subgraph_nodes_;
+  // size_t global_sub_size = total_sn.reduce();
+
   // prefix sum over subgraph degrees from previous phase to get starting points
-  for (size_t i = 0; i < num_subgraph_nodes_; i++) {
-    if (local_subgraph_out_degrees_[i] == 0 &&
-        local_subgraph_in_degrees_[i] == 0) {
-      if (i < subgraph_master_boundary_) {
-        empty_masters += 1;
-      } else {
-        if (gnn_graph.GetNonLayerZeroMasters().test(i)) {
-          empty_masters += 1;
-        } else {
-          empty_mirrors += 1;
-        }
-      }
-    }
-    if (i != 0) {
-      local_subgraph_out_degrees_[i] += local_subgraph_out_degrees_[i - 1];
-      local_subgraph_in_degrees_[i] += local_subgraph_in_degrees_[i - 1];
-    }
+  for (size_t i = 1; i < num_subgraph_nodes_; i++) {
+    // if (local_subgraph_out_degrees_[i] == 0 &&
+    //    local_subgraph_in_degrees_[i] == 0) {
+    //  if (i < subgraph_master_boundary_) {
+    //    empty_masters += 1;
+    //  } else {
+    //    if (gnn_graph.GetNonLayerZeroMasters().test(i)) {
+    //      empty_masters += 1;
+    //    } else {
+    //      empty_mirrors += 1;
+    //    }
+    //  }
+    //}
+    local_subgraph_out_degrees_[i] += local_subgraph_out_degrees_[i - 1];
+    local_subgraph_in_degrees_[i] += local_subgraph_in_degrees_[i - 1];
   }
 
-  uint32_t emaster = empty_masters.reduce();
-  uint32_t emirror = empty_mirrors.reduce();
-  if (gnn_graph.host_id() == 0) {
-    galois::gInfo("empty masters percent is ", emaster / (float)global_sub_size,
-                  " ", emaster, " ", global_sub_size);
-    galois::gInfo("empty mirrors percent is ", emirror / (float)global_sub_size,
-                  " ", emirror, " ", global_sub_size);
-  }
+  // uint32_t emaster = empty_masters.reduce();
+  // uint32_t emirror = empty_mirrors.reduce();
+  // if (gnn_graph.host_id() == 0) {
+  //  galois::gInfo("Empty masters percent is ", emaster /
+  //  (float)global_sub_size,
+  //                " ", emaster, " ", global_sub_size);
+  //  galois::gInfo("Empty mirrors percent is ", emirror /
+  //  (float)global_sub_size,
+  //                " ", emirror, " ", global_sub_size);
+  //}
 
   // allocate then set node endpoints
   num_subgraph_edges_ = local_subgraph_out_degrees_[num_subgraph_nodes_ - 1];
@@ -214,8 +219,8 @@ void galois::graphs::GNNGraph::GNNSubgraph::EdgeCreation(
   underlying_graph_.CSCAllocate();
   TimerStop(&alloc_time);
 
-  galois::gInfo("subgraph nodes and edges are ", num_subgraph_nodes_, " ",
-                num_subgraph_edges_);
+  galois::gInfo(gnn_graph.host_prefix(), "Subgraph nodes and edges are ",
+                num_subgraph_nodes_, " ", num_subgraph_edges_);
 
   galois::do_all(galois::iterate(uint32_t{0}, num_subgraph_nodes_),
                  [&](uint32_t subgraph_id) {

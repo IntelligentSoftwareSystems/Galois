@@ -199,6 +199,25 @@ public:
   //! most literature
   void GradientPropagation();
 
+  //! # nodes may change in distributed setting due to dead mirrors;
+  //! given the # of nodes at each layer, fix the input/output rows
+  void CorrectRowCounts(const std::vector<unsigned>& nodes_at_each_layer) {
+    size_t layer_offset = 0;
+    // work backwards
+    for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
+         back_iter++) {
+      GNNLayerType layer_type = (*back_iter)->layer_type();
+      if (layer_type == GNNLayerType::kGraphConvolutional ||
+          layer_type == GNNLayerType::kSAGE) {
+        (*back_iter)
+            ->ResizeInputOutputRows(nodes_at_each_layer[layer_offset + 1],
+                                    nodes_at_each_layer[layer_offset]);
+        layer_offset++;
+      }
+    }
+    GALOIS_LOG_ASSERT(layer_offset + 1 == nodes_at_each_layer.size());
+  }
+
   //! Call whenever resize occurs to correct reuse of pointers for layers
   void CorrectBackwardLinks();
 

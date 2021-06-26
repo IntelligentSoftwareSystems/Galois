@@ -215,7 +215,7 @@ float galois::GraphNeuralNetwork::MinibatchedTesting() {
     }
 
     // resize layer matrices
-    graph_->ConstructSampledSubgraph(num_sampled_layers);
+    CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));
     graph_->EnableSubgraphChooseAll();
     CorrectBackwardLinks();
 
@@ -278,7 +278,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         num_sampled_layers++;
       }
     }
-    graph_->ConstructSampledSubgraph(num_sampled_layers);
+    CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));
     CorrectBackwardLinks();
   }
 
@@ -342,7 +342,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         }
       }
       // resize layer matrices
-      graph_->ConstructSampledSubgraph(num_sampled_layers);
+      CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));
       CorrectBackwardLinks();
       mb_timer.stop();
     }
@@ -379,6 +379,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         gnn_layers_.back()->ResizeInputOutputRows(seed_node_count,
                                                   seed_node_count);
 
+        // +1 later in call because 0 is already taken
         size_t num_sampled_layers = 0;
         for (auto back_iter = gnn_layers_.rbegin();
              back_iter != gnn_layers_.rend(); back_iter++) {
@@ -411,7 +412,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         }
 
         // resize layer matrices
-        graph_->ConstructSampledSubgraph(num_sampled_layers);
+        CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));
         CorrectBackwardLinks();
         // XXX resizes above only work for SAGE layers; will break if other
         // layers are tested
@@ -598,7 +599,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
             num_sampled_layers++;
           }
         }
-        graph_->ConstructSampledSubgraph(num_sampled_layers);
+        CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));
         CorrectBackwardLinks();
       }
 

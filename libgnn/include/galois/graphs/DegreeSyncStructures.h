@@ -61,9 +61,7 @@ struct InitialDegreeSync {
 struct SubgraphDegreeSync {
   using ValTy = galois::gstl::Vector<uint32_t>;
 
-  static size_t FeatVecSize() {
-    return gnn_sampled_out_degrees_->size();
-  }
+  static size_t FeatVecSize() { return gnn_sampled_out_degrees_->size(); }
 
   static ValTy extract(uint32_t lid, char&) {
     ValTy vec_to_send(gnn_sampled_out_degrees_->size());
