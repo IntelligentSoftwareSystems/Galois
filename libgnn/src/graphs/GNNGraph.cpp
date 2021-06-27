@@ -1215,6 +1215,9 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
     sample_master_offsets_[i] = master_offset_accum_[i].reduce();
     sample_mirror_offsets_[i] = mirror_offset_accum_[i].reduce();
     new_rows[i] = sample_master_offsets_[i] + sample_mirror_offsets_[i];
+    if (i > 0) {
+      new_rows[i] += new_rows[i - 1];
+    }
   }
 
   if (!use_view) {

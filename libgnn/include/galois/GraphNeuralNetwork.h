@@ -209,6 +209,8 @@ public:
       GNNLayerType layer_type = (*back_iter)->layer_type();
       if (layer_type == GNNLayerType::kGraphConvolutional ||
           layer_type == GNNLayerType::kSAGE) {
+        GALOIS_LOG_ASSERT(nodes_at_each_layer[layer_offset + 1] >=
+                          nodes_at_each_layer[layer_offset]);
         (*back_iter)
             ->ResizeInputOutputRows(nodes_at_each_layer[layer_offset + 1],
                                     nodes_at_each_layer[layer_offset]);
