@@ -178,6 +178,9 @@ struct GNNSampleSumAggregate {
     extracted_vec.reserve(gnn_matrix_to_sync_column_length_);
     if ((*gnn_lid_to_sid_pointer_)[node_id] ==
         std::numeric_limits<uint32_t>::max()) {
+      // need to have correct size because serializer will expect
+      // it to be of a certain length
+      extracted_vec.resize(gnn_matrix_to_sync_column_length_, 0);
       return extracted_vec;
     }
 
