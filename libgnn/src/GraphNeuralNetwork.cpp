@@ -655,12 +655,21 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
 const galois::PointerWithSize<galois::GNNFloat>
 galois::GraphNeuralNetwork::DoInference() {
+  galois::StatTimer timer("DoInference", "GraphNeuralNetwork");
+  if (timers_on_) {
+    timer.start();
+  }
+
   // start with graph features and pass it through all layers of the network
   galois::PointerWithSize<galois::GNNFloat> layer_input =
       graph_->GetLocalFeatures();
 
   for (std::unique_ptr<galois::GNNLayer>& ptr : gnn_layers_) {
     layer_input = ptr->ForwardPhase(layer_input);
+  }
+
+  if (timers_on_) {
+    timer.stop();
   }
 
   return layer_input;
@@ -688,6 +697,11 @@ float galois::GraphNeuralNetwork::GetGlobalAccuracy(
 }
 
 void galois::GraphNeuralNetwork::GradientPropagation() {
+  galois::StatTimer timer("GradientPropagation", "GraphNeuralNetwork");
+  if (timers_on_) {
+    timer.start();
+  }
+
   // from output layer get initial gradients
   std::vector<galois::GNNFloat> dummy;
   std::unique_ptr<galois::GNNLayer>& output_layer = gnn_layers_.back();
@@ -714,6 +728,10 @@ void galois::GraphNeuralNetwork::GradientPropagation() {
     // at this point in the layer the gradients exist; use the gradients to
     // update the weights of the layer
     gnn_layers_[layer_index]->OptimizeLayer(optimizer_.get(), layer_index);
+  }
+
+  if (timers_on_) {
+    timer.stop();
   }
 }
 

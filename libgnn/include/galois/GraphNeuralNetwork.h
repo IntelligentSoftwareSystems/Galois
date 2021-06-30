@@ -231,7 +231,10 @@ public:
 private:
   static const constexpr char* kRegionName = "GraphNeuralNetwork";
 
+  bool timers_on_{false};
+
   void EnableTimers() {
+    timers_on_ = true;
     galois::gDebug("Enabling timers");
     graph_->EnableTimers();
     for (auto& layer : gnn_layers_)
@@ -239,6 +242,7 @@ private:
   }
 
   void DisableTimers() {
+    timers_on_ = false;
     galois::gDebug("Disabling timers");
     graph_->DisableTimers();
     for (auto& layer : gnn_layers_)
