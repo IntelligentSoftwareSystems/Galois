@@ -88,7 +88,7 @@ galois::SoftmaxLayer::ForwardPhase(
 
 galois::PointerWithSize<galois::GNNFloat>
 galois::SoftmaxLayer::BackwardPhaseCPU() {
-  galois::StatTimer timer("SoftmaxForward", "SoftmaxLayer");
+  galois::StatTimer timer("SoftmaxBackward", "SoftmaxLayer");
   TimerStart(&timer);
 
   const size_t feature_length = layer_dimensions_.input_columns;
