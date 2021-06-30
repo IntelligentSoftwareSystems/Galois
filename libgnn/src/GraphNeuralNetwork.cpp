@@ -188,9 +188,11 @@ float galois::GraphNeuralNetwork::MinibatchedTesting() {
   uint32_t total   = 0;
   while (true) {
     work_left_.reset();
-    size_t seed_node_count = graph_->PrepareNextTestMinibatch();
+    // size_t seed_node_count = graph_->PrepareNextTestMinibatch();
+    graph_->PrepareNextTestMinibatch();
     // last layer input size/output rows becomes seed node size
-    gnn_layers_.back()->ResizeInputOutputRows(seed_node_count, seed_node_count);
+    // gnn_layers_.back()->ResizeInputOutputRows(seed_node_count,
+    // seed_node_count);
     size_t num_sampled_layers = 0;
 
     for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
@@ -200,14 +202,14 @@ float galois::GraphNeuralNetwork::MinibatchedTesting() {
           layer_type == GNNLayerType::kSAGE) {
         // you can minibatch with sampling or minibatch and grab all
         // relevant neighbors
-        size_t current_sample_size;
-        current_sample_size =
-            graph_->SampleAllEdges((*back_iter)->graph_user_layer_number(),
-                                   false, num_sampled_layers + 1);
+        // size_t current_sample_size;
+        graph_->SampleAllEdges((*back_iter)->graph_user_layer_number(), false,
+                               num_sampled_layers + 1);
         // resize this layer, change seed node count
-        (*back_iter)
-            ->ResizeInputOutputRows(current_sample_size, seed_node_count);
-        seed_node_count = current_sample_size;
+        //(*back_iter)
+        //    ->ResizeInputOutputRows(current_sample_size, seed_node_count);
+        // seed_node_count = current_sample_size;
+
         num_sampled_layers++;
         // XXX resizes above only work for SAGE layers; will break if other
         // layers are tested
@@ -257,7 +259,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
                    local_seed_node_count);
     size_t num_sampled_layers = 0;
-    gnn_layers_.back()->ResizeRows(local_seed_node_count);
+    // gnn_layers_.back()->ResizeRows(local_seed_node_count);
     for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
          back_iter++) {
       GNNLayerType layer_type = (*back_iter)->layer_type();
@@ -271,8 +273,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                        (*back_iter)->graph_user_layer_number(), " is ",
                        current_sample_size);
         // resizing
-        (*back_iter)
-            ->ResizeInputOutputRows(current_sample_size, local_seed_node_count);
+        //(*back_iter)
+        //    ->ResizeInputOutputRows(current_sample_size,
+        //    local_seed_node_count);
         local_seed_node_count = current_sample_size;
         subgraph_layer_sizes.emplace_back(local_seed_node_count);
         num_sampled_layers++;
@@ -313,7 +316,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       mb_timer.start();
 
       size_t local_seed_node_count = graph_->SetupNeighborhoodSample();
-      gnn_layers_.back()->ResizeRows(local_seed_node_count);
+      // gnn_layers_.back()->ResizeRows(local_seed_node_count);
       galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
                      local_seed_node_count);
       size_t num_sampled_layers = 0;
@@ -334,9 +337,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                          (*back_iter)->graph_user_layer_number(), " is ",
                          current_sample_size);
 
-          (*back_iter)
-              ->ResizeInputOutputRows(current_sample_size,
-                                      local_seed_node_count);
+          //(*back_iter)
+          //    ->ResizeInputOutputRows(current_sample_size,
+          //                            local_seed_node_count);
           local_seed_node_count = current_sample_size;
           num_sampled_layers++;
         }
@@ -376,8 +379,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                        seed_node_count);
 
         // last layer input size/output rows becomes seed node size
-        gnn_layers_.back()->ResizeInputOutputRows(seed_node_count,
-                                                  seed_node_count);
+        // gnn_layers_.back()->ResizeInputOutputRows(seed_node_count,
+        //                                          seed_node_count);
 
         // +1 later in call because 0 is already taken
         size_t num_sampled_layers = 0;
@@ -404,8 +407,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                            (*back_iter)->graph_user_layer_number(), " is ",
                            current_sample_size);
             // resize this layer, change seed node count
-            (*back_iter)
-                ->ResizeInputOutputRows(current_sample_size, seed_node_count);
+            //(*back_iter)
+            //    ->ResizeInputOutputRows(current_sample_size, seed_node_count);
             seed_node_count = current_sample_size;
             num_sampled_layers++;
           }
@@ -585,7 +588,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
                        local_seed_node_count);
         size_t num_sampled_layers = 0;
-        gnn_layers_.back()->ResizeRows(local_seed_node_count);
+        // gnn_layers_.back()->ResizeRows(local_seed_node_count);
         for (auto back_iter = gnn_layers_.rbegin();
              back_iter != gnn_layers_.rend(); back_iter++) {
           GNNLayerType layer_type = (*back_iter)->layer_type();
@@ -595,9 +598,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                 (*back_iter)->graph_user_layer_number(),
                 config_.inductive_subgraph_, num_sampled_layers + 1);
             // resizing
-            (*back_iter)
-                ->ResizeInputOutputRows(current_sample_size,
-                                        local_seed_node_count);
+            //(*back_iter)
+            //    ->ResizeInputOutputRows(current_sample_size,
+            //                            local_seed_node_count);
             local_seed_node_count = current_sample_size;
             num_sampled_layers++;
           }

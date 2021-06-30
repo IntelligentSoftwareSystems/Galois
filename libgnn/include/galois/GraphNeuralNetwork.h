@@ -202,6 +202,11 @@ public:
   //! # nodes may change in distributed setting due to dead mirrors;
   //! given the # of nodes at each layer, fix the input/output rows
   void CorrectRowCounts(const std::vector<unsigned>& nodes_at_each_layer) {
+    // assumes last layer is  output row and resizes it based on first
+    // offset
+    gnn_layers_.back()->ResizeInputOutputRows(nodes_at_each_layer[0],
+                                              nodes_at_each_layer[0]);
+
     size_t layer_offset = 0;
     // work backwards
     for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
