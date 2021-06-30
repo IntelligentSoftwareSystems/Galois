@@ -160,6 +160,11 @@ llvm::cl::opt<unsigned>
                   cll::desc("# of epochs to test test set (default 0)"),
                   cll::init(0));
 
+llvm::cl::opt<float>
+    learning_rate("learningRate",
+                  cll::desc("Adam optimizer learning rate (default 0.01)"),
+                  cll::init(0.01));
+
 const char* GNNPartitionToString(galois::graphs::GNNPartitionScheme s) {
   switch (s) {
   case galois::graphs::GNNPartitionScheme::kOEC:
@@ -304,8 +309,12 @@ CreateOptimizer(const galois::graphs::GNNGraph* gnn_graph) {
   }
   GALOIS_LOG_ASSERT(opt_sizes.size() == num_layers);
 
+  galois::AdamOptimizer::AdamConfiguration adam_config;
+  adam_config.alpha = learning_rate;
+
   // TODO only adam works right now, add the others later
-  return std::make_unique<galois::AdamOptimizer>(opt_sizes, num_layers);
+  return std::make_unique<galois::AdamOptimizer>(adam_config, opt_sizes,
+                                                 num_layers);
 }
 
 std::vector<unsigned> CreateFanOutVector() {

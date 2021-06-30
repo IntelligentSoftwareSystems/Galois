@@ -116,6 +116,7 @@ void GNNBenchStart(int argc, char** argv, const char* app, const char* desc,
                                  test_minibatch_size);
     galois::runtime::reportParam("GNNBench", "IsGraphSampled",
                                  do_graph_sampling);
+    galois::runtime::reportParam("GNNBench", "LearningRate", learning_rate);
   }
 
   char name[256];
