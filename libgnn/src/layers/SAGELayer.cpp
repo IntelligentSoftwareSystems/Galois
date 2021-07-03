@@ -295,7 +295,7 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
     AggregateAll(layer_dimensions_.input_columns, input_data, agg_data,
                  &input_column_intermediates_);
     assert(p_forward_output_matrix_.size() >=
-           layer_dimensions_.output_columns * layer_dimensions_.output_columns);
+           layer_dimensions_.output_rows * layer_dimensions_.output_columns);
     UpdateEmbeddings(agg_data, p_forward_output_matrix_.data(), true);
   } else {
     assert(p_out_temp_.size() >=
@@ -305,7 +305,7 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
     UpdateEmbeddings(input_data, p_out_temp_.data(), false);
     // A(FW)
     assert(p_forward_output_matrix_.size() >=
-           layer_dimensions_.output_columns * layer_dimensions_.output_columns);
+           layer_dimensions_.output_rows * layer_dimensions_.output_columns);
     AggregateAll(layer_dimensions_.output_columns, p_out_temp_.data(),
                  p_forward_output_matrix_.data(),
                  &output_column_intermediates_);
