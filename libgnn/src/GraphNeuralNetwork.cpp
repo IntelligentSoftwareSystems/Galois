@@ -179,6 +179,7 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 
 float galois::GraphNeuralNetwork::MinibatchedTesting() {
   galois::gDebug("Minibatched Testing");
+  graph_->DisableSubgraph();
   graph_->ResetTestMinibatcher();
   SetLayerPhases(galois::GNNPhase::kBatch);
 
@@ -630,7 +631,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   if (!config_.test_minibatch_size()) {
     for (auto layer = gnn_layers_.begin(); layer != gnn_layers_.end();
          layer++) {
-      // TODO nuclear resize
+      // TODO nuclear resize; this is **ridiculously** inefficient
+      // because full graph will be used even if not included in test
+      // k-hop neighborhood for eval
       (*layer)->ResizeRows(graph_->size());
     }
     CorrectBackwardLinks();
@@ -649,8 +652,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                                        global_accuracy);
   }
 
-  // return global_accuracy;
-  return 0;
+  return global_accuracy;
 }
 
 const galois::PointerWithSize<galois::GNNFloat>

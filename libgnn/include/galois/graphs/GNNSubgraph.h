@@ -12,6 +12,7 @@ public:
                                std::numeric_limits<uint32_t>::max());
     // the subgraph to original graph maps are allocated on demand in gstl
     // vectors since those change every epoch
+    subgraph_mirrors_.resize(galois::runtime::getSystemNetworkInterface().Num);
   }
   //! Given sampled bits set on gnn_graph, builds an explicit subgraph
   //! for the sampled bits
@@ -100,6 +101,10 @@ public:
   void EnableTimers() { use_timer_ = true; }
   void DisableTimers() { use_timer_ = false; }
 
+  std::vector<std::vector<size_t>>& GetSubgraphMirrors() {
+    return subgraph_mirrors_;
+  }
+
 private:
   bool use_timer_{true};
   void TimerStart(galois::StatTimer* t) {
@@ -152,4 +157,7 @@ private:
   //! Maps from subgraph in-edge id to original graph edge id (used to check if
   //! edge exists in particular layer)
   galois::PODResizeableArray<uint32_t> in_subedge_to_original_edge_;
+
+  //! Mirror mappings for Gluon for subgraph
+  std::vector<std::vector<size_t>> subgraph_mirrors_;
 };

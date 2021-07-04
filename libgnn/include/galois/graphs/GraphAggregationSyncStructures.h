@@ -13,6 +13,7 @@ extern size_t gnn_matrix_to_sync_column_length_;
 extern galois::DynamicBitSet bitset_graph_aggregate;
 extern galois::LargeArray<uint32_t>* gnn_lid_to_sid_pointer_;
 extern galois::DynamicBitSet bitset_sample_flag_;
+extern size_t subgraph_size_;
 #ifdef GALOIS_ENABLE_GPU
 extern struct CUDA_Context* cuda_ctx_for_sync;
 extern unsigned layer_number_to_sync;
@@ -216,9 +217,12 @@ struct GNNSampleSumAggregate {
         std::numeric_limits<uint32_t>::max()) {
       return false;
     }
+    assert((*gnn_lid_to_sid_pointer_)[node_id] < subgraph_size_);
 
     // loop and do addition
     for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
+      // galois::gPrint("write ", (*gnn_lid_to_sid_pointer_)[node_id] *
+      //                        gnn_matrix_to_sync_column_length_ + i, "\n");
       gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id] *
                               gnn_matrix_to_sync_column_length_ +
                           i] += y[i];
@@ -231,9 +235,14 @@ struct GNNSampleSumAggregate {
         std::numeric_limits<uint32_t>::max()) {
       return false;
     }
+    assert((*gnn_lid_to_sid_pointer_)[node_id] < subgraph_size_);
 
     // loop and do addition
     for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
+      // galois::gPrint(galois::runtime::getSystemNetworkInterface().ID,  "]
+      // nodeid ", node_id, " sid ",  (*gnn_lid_to_sid_pointer_)[node_id],
+      //               " write ", (*gnn_lid_to_sid_pointer_)[node_id] *
+      //                        gnn_matrix_to_sync_column_length_ + i, "\n");
       gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id] *
                               gnn_matrix_to_sync_column_length_ +
                           i] += y[i];
@@ -251,6 +260,7 @@ struct GNNSampleSumAggregate {
         std::numeric_limits<uint32_t>::max()) {
       return;
     }
+    assert((*gnn_lid_to_sid_pointer_)[node_id] < subgraph_size_);
 
     // loop and do addition
     for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
@@ -267,6 +277,11 @@ struct GNNSampleSumAggregate {
 
     // loop and do addition
     for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
+      // galois::gPrint(galois::runtime::getSystemNetworkInterface().ID,  "]
+      // broadxast nodeid ", node_id, " sid ",
+      // (*gnn_lid_to_sid_pointer_)[node_id],
+      //               " write ", (*gnn_lid_to_sid_pointer_)[node_id] *
+      //                        gnn_matrix_to_sync_column_length_ + i, "\n");
       gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id] *
                               gnn_matrix_to_sync_column_length_ +
                           i] = y[i];

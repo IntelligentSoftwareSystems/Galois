@@ -5,6 +5,10 @@ size_t galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraph(
     GNNGraph& gnn_graph, size_t num_sampled_layers) {
   galois::StatTimer timer("BuildSubgraph", kRegionName);
   TimerStart(&timer);
+  for (auto& vec : subgraph_mirrors_) {
+    vec.clear();
+    // vec.reserve(num_subgraph_nodes_ - subgraph_master_boundary_);
+  }
   CreateSubgraphMapping(gnn_graph, num_sampled_layers);
   if (num_subgraph_nodes_ == 0) {
     return 0;
@@ -118,6 +122,13 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
         }
         subgraph_id_to_lid_[sid_to_use]    = local_node_id;
         lid_to_subgraph_id_[local_node_id] = sid_to_use++;
+
+        uint32_t node_gid = gnn_graph.GetGID(local_node_id);
+        // mirror node; gids because they need to be sent as gids
+        // and converted over later
+        assert(node_gid < gnn_graph.global_size());
+        assert(subgraph_mirrors_.size() > gnn_graph.GetHostID(node_gid));
+        subgraph_mirrors_[gnn_graph.GetHostID(node_gid)].push_back(node_gid);
       }
     }
   }

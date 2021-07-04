@@ -69,6 +69,7 @@ public:
 
   //! Return # of nodes in the partitioned graph
   size_t size() const { return partitioned_graph_->size(); }
+  size_t global_size() const { return partitioned_graph_->globalSize(); }
   //! Returns # of nodes in the *graph that is currently active*.
   size_t active_size() const {
     if (!use_subgraph_ && !use_subgraph_view_) {
@@ -81,6 +82,9 @@ public:
   bool is_local(size_t gid) const { return partitioned_graph_->isLocal(gid); }
   size_t GetLID(size_t gid) const { return partitioned_graph_->getLID(gid); }
   size_t GetGID(size_t lid) const { return partitioned_graph_->getGID(lid); }
+  size_t GetHostID(size_t gid) const {
+    return partitioned_graph_->getHostID(gid);
+  }
 
   //! Node begin for all local nodes
   NodeIterator begin() const {
@@ -325,6 +329,7 @@ public:
   void DisableSubgraph() {
     use_subgraph_      = false;
     use_subgraph_view_ = false;
+    sync_substrate_->RevertHandshakeToRealGraph();
   }
   bool IsSubgraphOn() const { return use_subgraph_; }
   bool IsSubgraphViewOn() const { return use_subgraph_view_; }

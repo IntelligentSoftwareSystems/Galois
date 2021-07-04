@@ -41,6 +41,7 @@ namespace galois {
 namespace graphs {
 GNNFloat* gnn_matrix_to_sync_            = nullptr;
 size_t gnn_matrix_to_sync_column_length_ = 0;
+size_t subgraph_size_                    = 0;
 //! For synchronization of graph aggregations
 galois::DynamicBitSet bitset_graph_aggregate;
 galois::LargeArray<uint32_t>* gnn_lid_to_sid_pointer_ = nullptr;
@@ -204,6 +205,7 @@ void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
                                              bool is_backward) const {
   gnn_matrix_to_sync_               = matrix_to_sync;
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
+  subgraph_size_                    = active_size();
   if (!use_subgraph_ && !use_subgraph_view_) {
     // set globals for the sync substrate
     if (!is_backward) {
@@ -907,8 +909,7 @@ void galois::graphs::GNNGraph::InitializeSamplingData(size_t num_layers,
 }
 
 size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
-  use_subgraph_      = false;
-  use_subgraph_view_ = false;
+  DisableSubgraph();
 
   bitset_sample_flag_.resize(size());
   bitset_sample_flag_.reset();
@@ -987,6 +988,7 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
         mirror_offset += 1;
       }
 
+      // galois::gInfo(host_prefix_, "Seed node is ", GetGID(*x));
       local_seed_count += 1;
       // 0 = seed node
       sample_node_timestamps_[*x] = 0;
@@ -1002,8 +1004,7 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
 size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
                                                 bool inductive_subgraph,
                                                 size_t timestamp) {
-  use_subgraph_      = false;
-  use_subgraph_view_ = false;
+  DisableSubgraph();
 
   galois::do_all(
       galois::iterate(begin(), end()),
@@ -1066,6 +1067,8 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
     if (IsInSampledGraph(x)) {
       local_sample_count += 1;
       if (sample_node_timestamps_[*x] == std::numeric_limits<uint32_t>::max()) {
+        // galois::gInfo(host_prefix_, "Layer ", timestamp, " new node is ",
+        // GetGID(*x));
         sample_node_timestamps_[*x] = timestamp;
       }
     }
@@ -1177,8 +1180,8 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
                                                    bool use_view) {
   // false first so that the build process can use functions to access the
   // real graph
-  use_subgraph_            = false;
-  use_subgraph_view_       = false;
+  DisableSubgraph();
+
   gnn_sampled_out_degrees_ = &sampled_out_degrees_;
 
   // first, sync the degres of the sampled edges across all hosts
@@ -1226,6 +1229,8 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
     // a view only has lid<->sid mappings
     subgraph_->BuildSubgraphView(*this, num_sampled_layers);
   }
+
+  sync_substrate_->SetupSubgraphMirrors(subgraph_->GetSubgraphMirrors());
 
   // after this, this graph is a subgraph
   if (!use_view) {
