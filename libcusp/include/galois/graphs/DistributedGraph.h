@@ -543,6 +543,9 @@ private:
 
 public:
   virtual ~DistGraph() {}
+
+  unsigned GetLIDHost(uint64_t lid) const { return getHostIDImpl(getGID(lid)); }
+
   //! Determines which host has the master for a particular node
   //! @returns Host id of node in question
   inline unsigned getHostID(uint64_t gid) const { return getHostIDImpl(gid); }

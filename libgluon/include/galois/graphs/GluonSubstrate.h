@@ -119,12 +119,16 @@ private:
 
   // memoization optimization
   //! Master nodes on different hosts. For broadcast;
-  std::vector<std::vector<size_t>> masterNodes;
+  std::vector<std::vector<size_t>> master_nodes_concrete_;
+  std::vector<std::vector<size_t>> subgraph_master_nodes_;
+  std::vector<std::vector<size_t>>* masterNodes;
   //! Mirror nodes on different hosts. For reduce; comes from the user graph
   //! during initialization (we expect user to give to us)
-  std::vector<std::vector<size_t>>& mirrorNodes;
+  std::vector<std::vector<size_t>>* mirrorNodes;
   //! Maximum size of master or mirror nodes on different hosts
   size_t maxSharedSize;
+  //! Maximum size of master or mirror nodes on different hosts
+  size_t original_max_shared_size_;
 
 #ifdef GALOIS_USE_BARE_MPI
   std::vector<MPI_Group> mpi_identity_groups;
@@ -190,7 +194,7 @@ private:
         continue;
 
       galois::runtime::SendBuffer b;
-      gSerialize(b, mirrorNodes[x]);
+      gSerialize(b, (*mirrorNodes)[x]);
       net.sendTagged(x, galois::runtime::evilPhase, std::move(b));
     }
 
@@ -204,7 +208,7 @@ private:
         p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
 
-      galois::runtime::gDeserialize(p->second, masterNodes[p->first]);
+      galois::runtime::gDeserialize(p->second, (*masterNodes)[p->first]);
     }
     incrementEvilPhase();
   }
@@ -274,11 +278,11 @@ private:
     // convert the global ids stored in the master/mirror nodes arrays to local
     // ids
     // TODO: use 32-bit distinct vectors for masters and mirrors from here on
-    for (uint32_t h = 0; h < masterNodes.size(); ++h) {
+    for (uint32_t h = 0; h < masterNodes->size(); ++h) {
       galois::do_all(
-          galois::iterate(size_t{0}, masterNodes[h].size()),
+          galois::iterate(size_t{0}, (*masterNodes)[h].size()),
           [&](size_t n) {
-            masterNodes[h][n] = userGraph.getLID(masterNodes[h][n]);
+            (*masterNodes)[h][n] = userGraph.getLID((*masterNodes)[h][n]);
           },
 #if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier("MasterNodes").c_str()),
@@ -286,11 +290,11 @@ private:
           galois::no_stats());
     }
 
-    for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
+    for (uint32_t h = 0; h < mirrorNodes->size(); ++h) {
       galois::do_all(
-          galois::iterate(size_t{0}, mirrorNodes[h].size()),
+          galois::iterate(size_t{0}, (*mirrorNodes)[h].size()),
           [&](size_t n) {
-            mirrorNodes[h][n] = userGraph.getLID(mirrorNodes[h][n]);
+            (*mirrorNodes)[h][n] = userGraph.getLID((*mirrorNodes)[h][n]);
           },
 #if GALOIS_COMM_STATS
           galois::loopname(get_run_identifier("MirrorNodes").c_str()),
@@ -302,29 +306,31 @@ private:
 
     maxSharedSize = 0;
     // report masters/mirrors to/from other hosts as statistics
-    for (auto x = 0U; x < masterNodes.size(); ++x) {
+    for (auto x = 0U; x < masterNodes->size(); ++x) {
       if (x == id)
         continue;
       std::string master_nodes_str =
           "MasterNodesFrom_" + std::to_string(id) + "_To_" + std::to_string(x);
       galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(
-          RNAME, master_nodes_str, masterNodes[x].size());
-      if (masterNodes[x].size() > maxSharedSize) {
-        maxSharedSize = masterNodes[x].size();
+          RNAME, master_nodes_str, (*masterNodes)[x].size());
+      if ((*masterNodes)[x].size() > maxSharedSize) {
+        maxSharedSize = (*masterNodes)[x].size();
       }
     }
 
-    for (auto x = 0U; x < mirrorNodes.size(); ++x) {
+    for (auto x = 0U; x < mirrorNodes->size(); ++x) {
       if (x == id)
         continue;
       std::string mirror_nodes_str =
           "MirrorNodesFrom_" + std::to_string(x) + "_To_" + std::to_string(id);
       galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(
-          RNAME, mirror_nodes_str, mirrorNodes[x].size());
-      if (mirrorNodes[x].size() > maxSharedSize) {
-        maxSharedSize = mirrorNodes[x].size();
+          RNAME, mirror_nodes_str, (*mirrorNodes)[x].size());
+      if ((*mirrorNodes)[x].size() > maxSharedSize) {
+        maxSharedSize = (*mirrorNodes)[x].size();
       }
     }
+
+    original_max_shared_size_ = maxSharedSize;
 
     sendInfoToHost();
 
@@ -435,7 +441,8 @@ public:
         cartesianGrid(_cartesianGrid), partitionAgnostic(_partitionAgnostic),
         substrateDataMode(_enforcedDataMode), numHosts(numHosts), num_run(0),
         num_round(0), currentBVFlag(nullptr),
-        mirrorNodes(userGraph.getMirrorNodes()) {
+        masterNodes(&master_nodes_concrete_),
+        mirrorNodes(&(userGraph.getMirrorNodes())) {
     is_a_graph_ = _userGraph.is_a_graph();
     if (cartesianGrid.first != 0 && cartesianGrid.second != 0) {
       GALOIS_ASSERT(cartesianGrid.first * cartesianGrid.second == numHosts,
@@ -455,7 +462,7 @@ public:
 
     initBareMPI();
     // master setup from mirrors done by setupCommunication call
-    masterNodes.resize(numHosts);
+    masterNodes->resize(numHosts);
     // setup proxy communication
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
         "GraphCommSetupTime", RNAME);
@@ -464,11 +471,73 @@ public:
     Tgraph_construct_comm.stop();
   }
 
+  void RevertHandshakeToRealGraph() {
+    // XXX make sure I dont need anything else
+    masterNodes = &master_nodes_concrete_;
+    mirrorNodes = &(userGraph.getMirrorNodes());
+    maxSharedSize = original_max_shared_size_;
+  }
+
+  void
+  SetupSubgraphMirrors(std::vector<std::vector<size_t>>& subgraph_mirrors) {
+    galois::StatTimer t("SubgraphMirrorSetup");
+    t.start();
+
+    // resetup master mirrors
+    masterNodes = &subgraph_master_nodes_;
+    mirrorNodes = &subgraph_mirrors;
+    masterNodes->clear();
+    if (masterNodes->size() < numHosts)
+      masterNodes->resize(numHosts);
+
+    // Exchange information for memoization optimization.
+    exchangeProxyInfo();
+
+    assert(masterNodes->size() == numHosts);
+    assert(mirrorNodes->size() == numHosts);
+
+    // convert the global ids stored in the master/mirror nodes arrays to local
+    // ids
+    // TODO: use 32-bit distinct vectors for masters and mirrors from here on
+    for (uint32_t h = 0; h < masterNodes->size(); ++h) {
+      galois::do_all(
+          galois::iterate(size_t{0}, (*masterNodes)[h].size()),
+          [&](size_t n) {
+            (*masterNodes)[h][n] = userGraph.getLID((*masterNodes)[h][n]);
+          },
+          galois::no_stats());
+    }
+
+    for (uint32_t h = 0; h < mirrorNodes->size(); ++h) {
+      galois::do_all(
+          galois::iterate(size_t{0}, (*mirrorNodes)[h].size()),
+          [&](size_t n) {
+            (*mirrorNodes)[h][n] = userGraph.getLID((*mirrorNodes)[h][n]);
+          },
+          galois::no_stats());
+    }
+
+    maxSharedSize = 0;
+    for (auto x = 0U; x < masterNodes->size(); ++x) {
+      assert(x < mirrorNodes->size());
+      if (x == id)
+        continue;
+      if ((*masterNodes)[x].size() > maxSharedSize) {
+        maxSharedSize = (*masterNodes)[x].size();
+      }
+      if ((*mirrorNodes)[x].size() > maxSharedSize) {
+        maxSharedSize = (*mirrorNodes)[x].size();
+      }
+    }
+
+    t.stop();
+  }
+
+private:
   ////////////////////////////////////////////////////////////////////////////////
   // Data extraction from bitsets
   ////////////////////////////////////////////////////////////////////////////////
 
-private:
   /**
    * Given a bitset, determine the indices of the bitset that are currently
    * set.
@@ -820,7 +889,8 @@ private:
             typename std::enable_if<Is2DVector<VecTy>::value>::type* = nullptr>
   void getSendBuffer(std::string loopName, unsigned x,
                      galois::runtime::SendBuffer& b, size_t elem_size) {
-    auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
+    auto& sharedNodes =
+        (syncType == syncReduce) ? (*mirrorNodes) : (*masterNodes);
 
     SyncExtract2D<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(
         loopName, x, sharedNodes[x], b, elem_size);
@@ -850,7 +920,8 @@ private:
             typename std::enable_if<!Is2DVector<VecTy>::value>::type* = nullptr>
   void getSendBuffer(std::string loopName, unsigned x,
                      galois::runtime::SendBuffer& b, size_t elem_size) {
-    auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
+    auto& sharedNodes =
+        (syncType == syncReduce) ? (*mirrorNodes) : (*masterNodes);
 
     if (BitsetFnTy::is_valid()) {
       syncExtract<syncType, SyncFnTy, BitsetFnTy, VecTy, async>(
@@ -886,7 +957,8 @@ private:
    */
   template <bool async, SyncType syncType, typename VecType>
   void serializeMessage(std::string loopName, DataCommMode data_mode,
-                        size_t bit_set_count, std::vector<size_t>& indices,
+                        size_t bit_set_count,
+                        const std::vector<size_t>& indices,
                         galois::PODResizeableArray<unsigned int>& offsets,
                         galois::DynamicBitSet& bit_set_comm, VecType& val_vec,
                         galois::runtime::SendBuffer& b) {
@@ -931,7 +1003,8 @@ private:
   template <bool async, SyncType syncType, typename VecType>
   void
   serializeMessageVecHack(std::string loopName, DataCommMode data_mode,
-                          size_t bit_set_count, std::vector<size_t>& indices,
+                          size_t bit_set_count,
+                          const std::vector<size_t>& indices,
                           galois::PODResizeableArray<unsigned int>& offsets,
                           galois::DynamicBitSet& bit_set_comm, VecType& val_vec,
                           galois::runtime::SendBuffer& b) {
@@ -971,7 +1044,8 @@ private:
   // Calls data on the TwoDVector
   template <bool async, SyncType syncType, typename TwoDVecType>
   void SerializeMessage2D(std::string loopName, DataCommMode data_mode,
-                          size_t bit_set_count, std::vector<size_t>& indices,
+                          size_t bit_set_count,
+                          const std::vector<size_t>& indices,
                           galois::PODResizeableArray<unsigned int>& offsets,
                           galois::DynamicBitSet& bit_set_comm,
                           TwoDVecType& two_d_vec,
@@ -1014,12 +1088,11 @@ private:
 
   // Only serializes the prefix
   template <SyncType syncType>
-  void
-  SerializeMessagePrefix2D(std::string loopName, DataCommMode data_mode,
-                           size_t bit_set_count, std::vector<size_t>& indices,
-                           galois::PODResizeableArray<unsigned int>& offsets,
-                           galois::DynamicBitSet& bit_set_comm,
-                           galois::runtime::SendBuffer& b) {
+  void SerializeMessagePrefix2D(
+      std::string loopName, DataCommMode data_mode, size_t bit_set_count,
+      const std::vector<size_t>& indices,
+      galois::PODResizeableArray<unsigned int>& offsets,
+      galois::DynamicBitSet& bit_set_comm, galois::runtime::SendBuffer& b) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string serialize_timer_str(syncTypeStr + "SerializeMessagePrefix_" +
                                     get_run_identifier(loopName));
@@ -1258,7 +1331,8 @@ private:
    */
   bool nothingToSend(unsigned host, SyncType syncType,
                      WriteLocation writeLocation, ReadLocation readLocation) {
-    auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
+    auto& sharedNodes =
+        (syncType == syncReduce) ? (*mirrorNodes) : (*masterNodes);
     // TODO refactor (below)
     if (!isCartCut) {
       return (sharedNodes[host].size() == 0);
@@ -1287,7 +1361,8 @@ private:
    */
   bool nothingToRecv(unsigned host, SyncType syncType,
                      WriteLocation writeLocation, ReadLocation readLocation) {
-    auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
+    auto& sharedNodes =
+        (syncType == syncReduce) ? (*masterNodes) : (*mirrorNodes);
     // TODO refactor (above)
     if (!isCartCut) {
       return (sharedNodes[host].size() == 0);
@@ -2041,8 +2116,8 @@ private:
             typename std::enable_if<galois::runtime::is_memory_copyable<
                 typename SyncFnTy::ValTy>::value>::type* = nullptr>
   void syncExtract(std::string loopName, unsigned from_id,
-                   std::vector<size_t>& indices, galois::runtime::SendBuffer& b,
-                   size_t elem_size) {
+                   const std::vector<size_t>& indices,
+                   galois::runtime::SendBuffer& b, size_t elem_size) {
     uint32_t num = indices.size() * elem_size;
     static VecTy val_vec; // sometimes wasteful
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
@@ -2122,8 +2197,8 @@ private:
             typename std::enable_if<!galois::runtime::is_memory_copyable<
                 typename SyncFnTy::ValTy>::value>::type* = nullptr>
   void syncExtract(std::string loopName, unsigned from_id,
-                   std::vector<size_t>& indices, galois::runtime::SendBuffer& b,
-                   size_t elem_size) {
+                   const std::vector<size_t>& indices,
+                   galois::runtime::SendBuffer& b, size_t elem_size) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
@@ -2204,8 +2279,8 @@ private:
       bool async,
       typename std::enable_if<!BitsetFnTy::is_vector_bitset()>::type* = nullptr>
   void syncExtract(std::string loopName, unsigned from_id,
-                   std::vector<size_t>& indices, galois::runtime::SendBuffer& b,
-                   size_t elem_size) {
+                   const std::vector<size_t>& indices,
+                   galois::runtime::SendBuffer& b, size_t elem_size) {
     uint32_t num                        = indices.size() * elem_size;
     galois::DynamicBitSet& bit_set_comm = syncBitset;
     static VecTy val_vec; // sometimes wasteful
@@ -2337,7 +2412,7 @@ private:
       typename std::enable_if<!BitsetFnTy::is_vector_bitset()>::type* = nullptr,
       typename std::enable_if<is_vector_of_vec<VecTy>::value>::type*  = nullptr>
   void syncExtractFloatVecHack(std::string loopName, unsigned from_id,
-                               std::vector<size_t>& indices,
+                               const std::vector<size_t>& indices,
                                galois::runtime::SendBuffer& b,
                                size_t elem_size) {
     // TODO(loc) assumption that type in the VecTy is a vector of floats
@@ -2479,7 +2554,7 @@ private:
   template <SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
             typename VecTy, bool async>
   void SyncExtract2D(std::string loopName, unsigned from_id,
-                     std::vector<size_t>& indices,
+                     const std::vector<size_t>& indices,
                      galois::runtime::SendBuffer& b, size_t elem_size) {
     uint32_t num                        = indices.size() * elem_size;
     galois::DynamicBitSet& bit_set_comm = syncBitset;
@@ -2641,7 +2716,8 @@ private:
       SyncType syncType, typename SyncFnTy, typename BitsetFnTy, typename VecTy,
       bool async,
       typename std::enable_if<BitsetFnTy::is_vector_bitset()>::type* = nullptr>
-  void syncExtract(std::string loopName, unsigned, std::vector<size_t>& indices,
+  void syncExtract(std::string loopName, unsigned,
+                   const std::vector<size_t>& indices,
                    galois::runtime::SendBuffer& b, size_t elem_size) {
     uint32_t num                        = indices.size() * elem_size;
     galois::DynamicBitSet& bit_set_comm = syncBitset;
@@ -2684,13 +2760,11 @@ private:
         // vector extract, i.e. get element i of the vector (i passed in as
         // argument as well)
         if (data_mode == onlyData) {
-          // galois::gInfo(id, " node ", i, " has data to send");
           bit_set_count = indices.size();
           extractSubset<SyncFnTy, syncType, VecTy, true, true, true>(
               loopName, indices, bit_set_count, offsets, val_vec, i);
         } else if (data_mode !=
                    noData) { // bitsetData or offsetsData or gidsData
-          // galois::gInfo(id, " node ", i, " has data to send");
           extractSubset<SyncFnTy, syncType, VecTy, false, true, true>(
               loopName, indices, bit_set_count, offsets, val_vec, i);
         }
@@ -2926,9 +3000,10 @@ private:
     static VecTy val_vec;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
-    auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
-    uint32_t num      = sharedNodes[from_id].size();
-    size_t retval     = 0;
+    auto& sharedNodes =
+        (syncType == syncReduce) ? (*masterNodes) : (*mirrorNodes);
+    uint32_t num  = sharedNodes[from_id].size();
+    size_t retval = 0;
 
     Tset.start();
 
@@ -3014,12 +3089,13 @@ private:
         set_batch_timer_str.c_str(), RNAME);
     ////////////////////////////////////////////////////////////////////////////
 
-    galois::DynamicBitSet& bit_set_comm = syncBitset;
+    galois::DynamicBitSet& bit_set_comm               = syncBitset;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
-    auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
-    uint32_t num      = sharedNodes[from_id].size();
-    size_t retval     = 0;
+    auto& sharedNodes =
+        (syncType == syncReduce) ? (*masterNodes) : (*mirrorNodes);
+    uint32_t num  = sharedNodes[from_id].size();
+    size_t retval = 0;
 
     Tset.start();
 
@@ -3115,9 +3191,10 @@ private:
     static galois::gstl::Vector<float> single_array;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
-    auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
-    uint32_t num      = sharedNodes[from_id].size();
-    size_t retval     = 0;
+    auto& sharedNodes =
+        (syncType == syncReduce) ? (*masterNodes) : (*mirrorNodes);
+    uint32_t num  = sharedNodes[from_id].size();
+    size_t retval = 0;
 
     Tset.start();
 
@@ -3251,9 +3328,10 @@ private:
     static VecTy val_vec;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
-    auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
-    uint32_t num      = sharedNodes[from_id].size();
-    size_t retval     = 0;
+    auto& sharedNodes =
+        (syncType == syncReduce) ? (*masterNodes) : (*mirrorNodes);
+    uint32_t num  = sharedNodes[from_id].size();
+    size_t retval = 0;
 
     Tset.start();
 
@@ -3536,7 +3614,8 @@ private:
 
     if (rb.size() == 0) { // create the receive buffers
       TRecvTime.start();
-      auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
+      auto& sharedNodes =
+          (syncType == syncReduce) ? (*masterNodes) : (*mirrorNodes);
       rb.resize(numHosts);
       request.resize(numHosts, MPI_REQUEST_NULL);
 
@@ -3591,7 +3670,8 @@ private:
 
     if (window.size() == 0) { // create the windows
       TRecvTime.start();
-      auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
+      auto& sharedNodes =
+          (syncType == syncReduce) ? (*masterNodes) : (*mirrorNodes);
       window.resize(numHosts);
       rb.resize(numHosts);
 
@@ -4407,20 +4487,20 @@ public:
 
     // copy memoization meta-data
     m.num_master_nodes =
-        (unsigned int*)calloc(masterNodes.size(), sizeof(unsigned int));
+        (unsigned int*)calloc(masterNodes->size(), sizeof(unsigned int));
     ;
     m.master_nodes =
-        (unsigned int**)calloc(masterNodes.size(), sizeof(unsigned int*));
+        (unsigned int**)calloc(masterNodes->size(), sizeof(unsigned int*));
     ;
 
-    for (uint32_t h = 0; h < masterNodes.size(); ++h) {
-      m.num_master_nodes[h] = masterNodes[h].size();
+    for (uint32_t h = 0; h < masterNodes->size(); ++h) {
+      m.num_master_nodes[h] = (*masterNodes)[h].size();
 
-      if (masterNodes[h].size() > 0) {
-        m.master_nodes[h] =
-            (unsigned int*)calloc(masterNodes[h].size(), sizeof(unsigned int));
+      if ((*masterNodes)[h].size() > 0) {
+        m.master_nodes[h] = (unsigned int*)calloc((*masterNodes)[h].size(),
+                                                  sizeof(unsigned int));
         ;
-        std::copy(masterNodes[h].begin(), masterNodes[h].end(),
+        std::copy((*masterNodes)[h].begin(), (*masterNodes)[h].end(),
                   m.master_nodes[h]);
       } else {
         m.master_nodes[h] = NULL;
@@ -4428,19 +4508,19 @@ public:
     }
 
     m.num_mirror_nodes =
-        (unsigned int*)calloc(mirrorNodes.size(), sizeof(unsigned int));
+        (unsigned int*)calloc(mirrorNodes->size(), sizeof(unsigned int));
     ;
     m.mirror_nodes =
-        (unsigned int**)calloc(mirrorNodes.size(), sizeof(unsigned int*));
+        (unsigned int**)calloc(mirrorNodes->size(), sizeof(unsigned int*));
     ;
-    for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
-      m.num_mirror_nodes[h] = mirrorNodes[h].size();
+    for (uint32_t h = 0; h < mirrorNodes->size(); ++h) {
+      m.num_mirror_nodes[h] = (*mirrorNodes)[h].size();
 
-      if (mirrorNodes[h].size() > 0) {
-        m.mirror_nodes[h] =
-            (unsigned int*)calloc(mirrorNodes[h].size(), sizeof(unsigned int));
+      if ((*mirrorNodes)[h].size() > 0) {
+        m.mirror_nodes[h] = (unsigned int*)calloc((*mirrorNodes)[h].size(),
+                                                  sizeof(unsigned int));
         ;
-        std::copy(mirrorNodes[h].begin(), mirrorNodes[h].end(),
+        std::copy((*mirrorNodes)[h].begin(), (*mirrorNodes)[h].end(),
                   m.mirror_nodes[h]);
       } else {
         m.mirror_nodes[h] = NULL;
@@ -4469,18 +4549,18 @@ public:
 
     // copy memoization meta-data
     g_info.num_master_nodes =
-        (unsigned int*)calloc(masterNodes.size(), sizeof(unsigned int));
+        (unsigned int*)calloc(masterNodes->size(), sizeof(unsigned int));
     g_info.master_nodes =
-        (unsigned int**)calloc(masterNodes.size(), sizeof(unsigned int*));
+        (unsigned int**)calloc(masterNodes->size(), sizeof(unsigned int*));
 
-    for (uint32_t h = 0; h < masterNodes.size(); ++h) {
-      g_info.num_master_nodes[h] = masterNodes[h].size();
+    for (uint32_t h = 0; h < masterNodes->size(); ++h) {
+      g_info.num_master_nodes[h] = (*masterNodes)[h].size();
 
-      if (masterNodes[h].size() > 0) {
-        g_info.master_nodes[h] =
-            (unsigned int*)calloc(masterNodes[h].size(), sizeof(unsigned int));
+      if ((*masterNodes)[h].size() > 0) {
+        g_info.master_nodes[h] = (unsigned int*)calloc((*masterNodes)[h].size(),
+                                                       sizeof(unsigned int));
         ;
-        std::copy(masterNodes[h].begin(), masterNodes[h].end(),
+        std::copy((*masterNodes)[h].begin(), (*masterNodes)[h].end(),
                   g_info.master_nodes[h]);
       } else {
         g_info.master_nodes[h] = NULL;
@@ -4488,16 +4568,16 @@ public:
     }
 
     g_info.num_mirror_nodes =
-        (unsigned int*)calloc(mirrorNodes.size(), sizeof(unsigned int));
+        (unsigned int*)calloc(mirrorNodes->size(), sizeof(unsigned int));
     g_info.mirror_nodes =
-        (unsigned int**)calloc(mirrorNodes.size(), sizeof(unsigned int*));
-    for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
-      g_info.num_mirror_nodes[h] = mirrorNodes[h].size();
+        (unsigned int**)calloc(mirrorNodes->size(), sizeof(unsigned int*));
+    for (uint32_t h = 0; h < mirrorNodes->size(); ++h) {
+      g_info.num_mirror_nodes[h] = (*mirrorNodes)[h].size();
 
-      if (mirrorNodes[h].size() > 0) {
-        g_info.mirror_nodes[h] =
-            (unsigned int*)calloc(mirrorNodes[h].size(), sizeof(unsigned int));
-        std::copy(mirrorNodes[h].begin(), mirrorNodes[h].end(),
+      if ((*mirrorNodes)[h].size() > 0) {
+        g_info.mirror_nodes[h] = (unsigned int*)calloc((*mirrorNodes)[h].size(),
+                                                       sizeof(unsigned int));
+        std::copy((*mirrorNodes)[h].begin(), (*mirrorNodes)[h].end(),
                   g_info.mirror_nodes[h]);
       } else {
         g_info.mirror_nodes[h] = NULL;

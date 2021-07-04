@@ -2589,6 +2589,7 @@ private:
     for (uint32_t i = base_DistGraph::numOwned; i < base_DistGraph::numNodes;
          i++) {
       uint32_t globalID = base_DistGraph::localToGlobalVector[i];
+      assert(graphPartitioner->retrieveMaster(globalID) != base_DistGraph::id);
       base_DistGraph::mirrorNodes[graphPartitioner->retrieveMaster(globalID)]
           .push_back(globalID);
     }
