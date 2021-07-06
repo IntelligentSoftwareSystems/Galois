@@ -1230,7 +1230,8 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
     subgraph_->BuildSubgraphView(*this, num_sampled_layers);
   }
 
-  sync_substrate_->SetupSubgraphMirrors(subgraph_->GetSubgraphMirrors());
+  sync_substrate_->SetupSubgraphMirrors(subgraph_->GetSubgraphMirrors(),
+                                        use_timer_);
 
   // after this, this graph is a subgraph
   if (!use_view) {

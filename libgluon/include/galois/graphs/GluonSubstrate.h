@@ -479,9 +479,12 @@ public:
   }
 
   void
-  SetupSubgraphMirrors(std::vector<std::vector<size_t>>& subgraph_mirrors) {
+  SetupSubgraphMirrors(std::vector<std::vector<size_t>>& subgraph_mirrors,
+                       bool use_timer) {
     galois::StatTimer t("SubgraphMirrorSetup");
-    t.start();
+    if (use_timer) {
+      t.start();
+    }
 
     // resetup master mirrors
     masterNodes = &subgraph_master_nodes_;
@@ -530,7 +533,9 @@ public:
       }
     }
 
-    t.stop();
+    if (use_timer) {
+      t.stop();
+    }
   }
 
 private:
