@@ -222,6 +222,8 @@ void galois::SAGELayer::ResizeIntermediates(size_t new_input_rows,
 }
 
 void galois::SAGELayer::WeightGradientSyncSum2() {
+  galois::StatTimer clubbed_timer("Sync_BackwardSync", "Gluon");
+  TimerStart(&clubbed_timer);
   galois::StatTimer t("Sync_WeightGradientsSum2", kRegionName);
   TimerStart(&t);
   int weight_size = static_cast<int>(p_layer_weight_gradients_2_.size());
@@ -250,6 +252,7 @@ void galois::SAGELayer::WeightGradientSyncSum2() {
   }
 #endif
   TimerStop(&t);
+  TimerStop(&clubbed_timer);
 }
 
 const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(

@@ -356,6 +356,8 @@ void galois::GNNLayer::ActivationDerivative(
 }
 
 void galois::GNNLayer::WeightGradientSyncSum() {
+  galois::StatTimer clubbed_timer("Sync_BackwardSync", "Gluon");
+  TimerStart(&clubbed_timer);
   galois::StatTimer t("Sync_WeightGradientsSum", "GNNLayer");
   TimerStart(&t);
   int weight_size = static_cast<int>(p_layer_weight_gradients_.size());
@@ -385,6 +387,7 @@ void galois::GNNLayer::WeightGradientSyncSum() {
   }
 #endif
   TimerStop(&t);
+  TimerStop(&clubbed_timer);
 }
 
 void galois::GNNLayer::MaskInputNonMasters(PointerWithSize<GNNFloat>* input,

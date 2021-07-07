@@ -217,9 +217,12 @@ void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
                               Bitset_graph_aggregate>("Ignore");
       }
     } else {
+      galois::StatTimer clubbed_timer("Sync_BackwardSync", "Gluon");
+      clubbed_timer.start();
       sync_substrate_->sync<writeDestination, readAny, GNNSumAggregate,
                             Bitset_graph_aggregate>(
           "BackwardGraphAggregateSync");
+      clubbed_timer.stop();
     }
   } else {
     // setup the SID to LID map for the sync substrate to use (SID != LID)
@@ -234,9 +237,12 @@ void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
                               Bitset_graph_aggregate>("Ignore");
       }
     } else {
+      galois::StatTimer clubbed_timer("Sync_BackwardSync", "Gluon");
+      clubbed_timer.start();
       sync_substrate_->sync<writeDestination, readAny, GNNSampleSumAggregate,
                             Bitset_graph_aggregate>(
           "BackwardGraphAggregateSync");
+      clubbed_timer.stop();
     }
   }
 }
