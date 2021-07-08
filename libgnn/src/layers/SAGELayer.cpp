@@ -65,6 +65,12 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
   size_t num_in_temp_elements =
       layer_dimensions_.output_rows * layer_dimensions_.input_columns;
 
+  if (layer_number_ == 0) {
+    // set this to true for layer 0; it avoids aggregation completely
+    // in the last layer for the backward phase
+    config_.disable_aggregate_after_update = true;
+  }
+
   // if in temp is smaller than out temp, or if dropout exists
   if (!config_.disable_dropout || config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
@@ -366,6 +372,8 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     // aggregate occurs regardless of layer being equal to 0 because it is
     // required in this case for the weight gradient calculation
     // this is (FW)'
+    // TODO: this is absolutely terrible performance wise as well; keep
+    // in mind
     AggregateAll(layer_dimensions_.output_columns, input_gradient->data(),
                  p_out_temp_.data(), &output_column_intermediates_, true);
   }
@@ -458,6 +466,8 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
 
     // 0 means input gradient shouldn't get masked
     if (layer_number_ != 0) {
+      // NOTE: this is super nice because it avoids aggregation completely
+      // in the layer 0 setting
       // ---unmasked---
       // transposed sgemm for derivative; in_temp is output
       assert(input_gradient->size() >=
