@@ -65,11 +65,15 @@ galois::SAGELayer::SAGELayer(size_t layer_num,
   size_t num_in_temp_elements =
       layer_dimensions_.output_rows * layer_dimensions_.input_columns;
 
-  if (layer_number_ == 0) {
-    // set this to true for layer 0; it avoids aggregation completely
-    // in the last layer for the backward phase
-    config_.disable_aggregate_after_update = true;
-  }
+  // if (layer_number_ == 0) {
+  //   // set this to true for layer 0; it avoids aggregation completely
+  //   // in the last layer for the backward phase
+  //   config_.disable_aggregate_after_update = true;
+  //   // TODO this *will* hurt test evaluation because test eval has no
+  //   // backward phase, so the end-to-end benefits do not exist there
+  //   // Solution to this is to allocate all intermediate structures for both
+  //   // cases + make sure resize handles both cases
+  // }
 
   // if in temp is smaller than out temp, or if dropout exists
   if (!config_.disable_dropout || config_.disable_aggregate_after_update ||
