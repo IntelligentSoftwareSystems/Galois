@@ -45,6 +45,7 @@ size_t subgraph_size_                    = 0;
 //! For synchronization of graph aggregations
 galois::DynamicBitSet bitset_graph_aggregate;
 galois::LargeArray<uint32_t>* gnn_lid_to_sid_pointer_ = nullptr;
+size_t num_active_layer_rows_                         = 0;
 uint32_t* gnn_degree_vec_1_;
 uint32_t* gnn_degree_vec_2_;
 
@@ -200,12 +201,13 @@ bool galois::graphs::GNNGraph::IsValidForPhaseMasked(
   return (*mask_to_use)[lid];
 }
 
-void galois::graphs::GNNGraph::AggregateSync(GNNFloat* matrix_to_sync,
-                                             const size_t matrix_column_size,
-                                             bool is_backward) const {
+void galois::graphs::GNNGraph::AggregateSync(
+    GNNFloat* matrix_to_sync, const size_t matrix_column_size, bool is_backward,
+    uint32_t active_row_boundary) const {
   gnn_matrix_to_sync_               = matrix_to_sync;
   gnn_matrix_to_sync_column_length_ = matrix_column_size;
   subgraph_size_                    = active_size();
+  num_active_layer_rows_            = active_row_boundary;
   if (!use_subgraph_ && !use_subgraph_view_) {
     // set globals for the sync substrate
     if (!is_backward) {
@@ -971,11 +973,11 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   // Seed nodes sync
   if (use_timer_) {
     sync_substrate_
-        ->sync<writeSource, readAny, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeSource, readSource, SampleFlagSync, SampleFlagBitset>(
             "SeedNodeSample");
   } else {
     sync_substrate_
-        ->sync<writeSource, readAny, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeSource, readSource, SampleFlagSync, SampleFlagBitset>(
             "Ignore");
   }
   galois::GAccumulator<unsigned> local_seed_count;
@@ -1058,11 +1060,11 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
 
   if (use_timer_) {
     sync_substrate_
-        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeDestination, readSource, SampleFlagSync, SampleFlagBitset>(
             "SampleFlag");
   } else {
     sync_substrate_
-        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeDestination, readSource, SampleFlagSync, SampleFlagBitset>(
             "Ignore");
   }
 
@@ -1155,11 +1157,11 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
   // correctly
   if (use_timer_) {
     sync_substrate_
-        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeDestination, readSource, SampleFlagSync, SampleFlagBitset>(
             "SampleFlag");
   } else {
     sync_substrate_
-        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeDestination, readSource, SampleFlagSync, SampleFlagBitset>(
             "Ignore");
   }
 

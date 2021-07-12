@@ -554,7 +554,8 @@ public:
   // issues later
   void AggregateSync(GNNFloat* matrix_to_sync,
                      const size_t matrix_column_size) const {
-    AggregateSync(matrix_to_sync, matrix_column_size, false);
+    AggregateSync(matrix_to_sync, matrix_column_size, false,
+                  std::numeric_limits<uint32_t>::max());
   };
 
   //! Given a matrix and the column size, do an aggregate sync where each row
@@ -563,7 +564,7 @@ public:
   //! Note that it's const because the only thing being used is the graph
   //! topology of this object; the thing modified is the passed in matrix
   void AggregateSync(GNNFloat* matrix_to_sync, const size_t matrix_column_size,
-                     bool is_backward) const;
+                     bool is_backward, uint32_t active_row_boundary) const;
 
   //////////////////////////////////////////////////////////////////////////////
   // Sampling related

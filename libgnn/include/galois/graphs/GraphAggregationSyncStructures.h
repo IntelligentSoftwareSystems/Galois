@@ -14,6 +14,7 @@ extern galois::DynamicBitSet bitset_graph_aggregate;
 extern galois::LargeArray<uint32_t>* gnn_lid_to_sid_pointer_;
 extern galois::DynamicBitSet bitset_sample_flag_;
 extern size_t subgraph_size_;
+extern size_t num_active_layer_rows_;
 #ifdef GALOIS_ENABLE_GPU
 extern struct CUDA_Context* cuda_ctx_for_sync;
 extern unsigned layer_number_to_sync;
@@ -253,37 +254,35 @@ struct GNNSampleSumAggregate {
   //! No-op: readAny = overwritten anyways
   static void reset(uint32_t, char&) {}
 
-  //! element wise set
+  // version where you have a vector object
   static void setVal(uint32_t node_id, char&, ValTy y) {
     assert(y.size() == gnn_matrix_to_sync_column_length_);
-    if ((*gnn_lid_to_sid_pointer_)[node_id] ==
-        std::numeric_limits<uint32_t>::max()) {
+    uint32_t converted_sid = (*gnn_lid_to_sid_pointer_)[node_id];
+    if (converted_sid >= num_active_layer_rows_ ||
+        converted_sid == std::numeric_limits<uint32_t>::max()) {
       return;
     }
-    assert((*gnn_lid_to_sid_pointer_)[node_id] < subgraph_size_);
+    assert(converted_sid < subgraph_size_);
 
     // loop and do addition
     for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
-      gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id] *
-                              gnn_matrix_to_sync_column_length_ +
+      gnn_matrix_to_sync_[converted_sid * gnn_matrix_to_sync_column_length_ +
                           i] = y[i];
     }
   }
+
+  // version where you have a pointer only (more efficient because this
+  // version is for reading directly from the recv buffer)
   static void setVal(uint32_t node_id, char&, ValTy::value_type* y) {
-    if ((*gnn_lid_to_sid_pointer_)[node_id] ==
-        std::numeric_limits<uint32_t>::max()) {
+    uint32_t converted_sid = (*gnn_lid_to_sid_pointer_)[node_id];
+    if (converted_sid >= num_active_layer_rows_ ||
+        converted_sid == std::numeric_limits<uint32_t>::max()) {
       return;
     }
 
     // loop and do addition
     for (unsigned i = 0; i < gnn_matrix_to_sync_column_length_; i++) {
-      // galois::gPrint(galois::runtime::getSystemNetworkInterface().ID,  "]
-      // broadxast nodeid ", node_id, " sid ",
-      // (*gnn_lid_to_sid_pointer_)[node_id],
-      //               " write ", (*gnn_lid_to_sid_pointer_)[node_id] *
-      //                        gnn_matrix_to_sync_column_length_ + i, "\n");
-      gnn_matrix_to_sync_[(*gnn_lid_to_sid_pointer_)[node_id] *
-                              gnn_matrix_to_sync_column_length_ +
+      gnn_matrix_to_sync_[converted_sid * gnn_matrix_to_sync_column_length_ +
                           i] = y[i];
     }
   }

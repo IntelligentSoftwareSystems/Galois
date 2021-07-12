@@ -573,11 +573,15 @@ void galois::SAGELayer::AggregateAll(
         pts,
     bool is_backward) {
   std::string agg_timer_name = "AggregateCompute";
+  size_t num_rows_to_handle;
   if (!is_backward) {
     agg_timer_name += "Forward";
+    num_rows_to_handle = layer_dimensions_.output_rows;
   } else {
     agg_timer_name += "Backward";
+    num_rows_to_handle = layer_dimensions_.input_rows;
   }
+
   galois::StatTimer timer(agg_timer_name.c_str(), kRegionName);
   TimerStart(&timer);
 
@@ -597,8 +601,10 @@ void galois::SAGELayer::AggregateAll(
     AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts,
                     is_backward);
     TimerStop(&timer);
+
     // aggregate sync
-    graph_.AggregateSync(aggregate_output, column_length, is_backward);
+    graph_.AggregateSync(aggregate_output, column_length, is_backward,
+                         num_rows_to_handle);
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
