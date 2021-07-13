@@ -13,6 +13,8 @@ int main(int argc, char* argv[]) {
   gnn->SetLayerPhases(galois::GNNPhase::kTrain);
   init_timer.stop();
 
+  galois::runtime::getHostBarrier().wait();
+
   galois::StatTimer compute_timer("Timer_0");
   compute_timer.start();
   gnn->Train(num_epochs);
