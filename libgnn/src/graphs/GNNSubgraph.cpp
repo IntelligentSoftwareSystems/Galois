@@ -7,7 +7,6 @@ size_t galois::graphs::GNNGraph::GNNSubgraph::BuildSubgraph(
   TimerStart(&timer);
   for (auto& vec : subgraph_mirrors_) {
     vec.clear();
-    // vec.reserve(num_subgraph_nodes_ - subgraph_master_boundary_);
   }
   CreateSubgraphMapping(gnn_graph, num_sampled_layers);
   if (num_subgraph_nodes_ == 0) {
@@ -43,23 +42,30 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
   std::fill(lid_to_subgraph_id_.begin(), lid_to_subgraph_id_.end(),
             std::numeric_limits<uint32_t>::max());
 
-  std::vector<unsigned>& master_offsets = gnn_graph.GetMasterOffsets();
-  std::vector<unsigned>& mirror_offsets = gnn_graph.GetMirrorOffsets();
-
   galois::GAccumulator<uint32_t> subgraph_count;
   subgraph_count.reset();
   galois::do_all(galois::iterate(gnn_graph.begin(), gnn_graph.end()),
                  [&](uint32_t node_id) {
-                   // if (gnn_graph.IsInSampledGraph(node_id)) {
                    if (gnn_graph.IsActiveInSubgraph(node_id)) {
                      subgraph_count += 1;
                    }
                  });
   num_subgraph_nodes_ = subgraph_count.reduce();
+  // if no subgraph, get out
+  if (num_subgraph_nodes_ == 0) {
+    subgraph_master_boundary_ = 0;
+    TimerStop(&timer);
+    return;
+  }
+
   if (subgraph_id_to_lid_.size() < num_subgraph_nodes_) {
+    // allocate a bit more than necessary to avoid a big realloc
+    // if node value changes slightly later
     subgraph_id_to_lid_.resize(num_subgraph_nodes_ * 1.02);
   }
 
+  // bitset to mark if a master is outside the "master only" boundary
+  // and not contiguous; needed to mask out non-masters
   galois::DynamicBitSet& non_layer_zero_masters =
       gnn_graph.GetNonLayerZeroMasters();
   // init the bitset as necessary
@@ -69,8 +75,12 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
     non_layer_zero_masters.reset();
   }
 
+  std::vector<unsigned>& master_offsets = gnn_graph.GetMasterOffsets();
+  std::vector<unsigned>& mirror_offsets = gnn_graph.GetMirrorOffsets();
+
+  ResetSIDThreadOffsets(master_offsets.size());
+
   // compute offsets for each layer
-  uint32_t layer_zero_offset = 0;
   galois::PODResizeableArray<unsigned> layer_offsets;
   layer_offsets.resize(master_offsets.size() - 1);
   for (unsigned i = 0; i < layer_offsets.size(); i++) {
@@ -81,59 +91,162 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
     }
   }
 
-  // split into 2 parts: masters, then everything else
-  size_t last_owned_node = *(gnn_graph.end_owned());
-  for (size_t local_node_id = 0; local_node_id < last_owned_node;
-       local_node_id++) {
-    if (gnn_graph.IsActiveInSubgraph(local_node_id)) {
-      unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
-      if (node_timestamp != std::numeric_limits<unsigned>::max()) {
-        uint32_t sid_to_use;
-        if (node_timestamp != 0) {
-          sid_to_use = layer_offsets[node_timestamp - 1]++;
-          // master that won't be in prefix needs to be marked
-          non_layer_zero_masters.set(sid_to_use);
-        } else {
-          sid_to_use = layer_zero_offset++;
-        }
-        subgraph_id_to_lid_[sid_to_use]    = local_node_id;
-        lid_to_subgraph_id_[local_node_id] = sid_to_use++;
-      }
-    }
-  }
-
   // all nodes before this SID are master nodes in layer 0;
   // NOTE: there are master nodes past this boundary that will
   // not be covered by a begin_owned loop, which may cause problems down
-  // the line
+  // the line; this is handled by the bitset above
   subgraph_master_boundary_ = master_offsets[0];
 
-  // everything else; none of these are master nodes
-  for (size_t local_node_id = last_owned_node; local_node_id < gnn_graph.size();
-       local_node_id++) {
-    if (gnn_graph.IsActiveInSubgraph(local_node_id)) {
-      unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
-      if (node_timestamp != std::numeric_limits<unsigned>::max()) {
-        uint32_t sid_to_use;
-        if (node_timestamp != 0) {
-          sid_to_use = layer_offsets[node_timestamp - 1]++;
-        } else {
-          sid_to_use = layer_zero_offset++;
-        }
-        subgraph_id_to_lid_[sid_to_use]    = local_node_id;
-        lid_to_subgraph_id_[local_node_id] = sid_to_use++;
+  size_t last_owned_node = *(gnn_graph.end_owned());
+  // compute amount of work each thread needs to do
+  galois::on_each([&](size_t thread_id, size_t num_threads) {
+    unsigned start_node;
+    unsigned end_node;
+    // this thread always has a set number of nodes to run; this is it
+    std::tie(start_node, end_node) = galois::block_range(
+        size_t{0}, gnn_graph.size(), thread_id, num_threads);
+    // these arrays track how much work will need to be done by this
+    // thread
+    galois::PODResizeableArray<unsigned>& my_offsets =
+        sid_thread_offsets_[thread_id];
+    galois::PODResizeableArray<unsigned>& my_mirror_offsets =
+        subgraph_mirror_offsets_[thread_id];
 
-        uint32_t node_gid = gnn_graph.GetGID(local_node_id);
-        // mirror node; gids because they need to be sent as gids
-        // and converted over later
-        assert(node_gid < gnn_graph.global_size());
-        assert(subgraph_mirrors_.size() > gnn_graph.GetHostID(node_gid));
-        subgraph_mirrors_[gnn_graph.GetHostID(node_gid)].push_back(node_gid);
+    for (size_t local_node_id = start_node; local_node_id < end_node;
+         local_node_id++) {
+      // only bother if node was active
+      if (gnn_graph.IsActiveInSubgraph(local_node_id)) {
+        unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
+        // TODO(loc) this check shouldn't even be necessary; active in subgraph
+        // implies added at somepoint
+        if (node_timestamp != std::numeric_limits<unsigned>::max()) {
+          // tracks how many nodes for each timestamp this node will
+          // work with by incrementing this
+          my_offsets[node_timestamp]++;
+
+          if (local_node_id >= last_owned_node) {
+            // this is a mirror node; get the host that the master is located
+            // on and increment this thread's mirror node count for that host
+            uint32_t node_gid = gnn_graph.GetGID(local_node_id);
+            my_mirror_offsets[gnn_graph.GetHostID(node_gid)]++;
+          }
+        } else {
+          GALOIS_LOG_WARN("shouldn't ever get here right?");
+        }
       }
+    }
+  });
+
+  // prefix sum the threads
+  galois::do_all(galois::iterate(size_t{0}, master_offsets.size()),
+                 [&](size_t layer_num) {
+                   for (size_t thread_id = 1;
+                        thread_id < galois::getActiveThreads(); thread_id++) {
+                     sid_thread_offsets_[thread_id][layer_num] +=
+                         sid_thread_offsets_[thread_id - 1][layer_num];
+                   }
+                 });
+
+  for (unsigned i = 0; i < master_offsets.size() - 1; i++) {
+    if (i > 0) {
+      GALOIS_LOG_VASSERT(
+          sid_thread_offsets_[galois::getActiveThreads() - 1][i] +
+                  layer_offsets[i - 1] ==
+              (layer_offsets[i]),
+          "layer {} wrong {} vs correct {}", i,
+          sid_thread_offsets_[galois::getActiveThreads() - 1][i],
+          layer_offsets[i]);
+    } else {
+      GALOIS_LOG_VASSERT(
+          sid_thread_offsets_[galois::getActiveThreads() - 1][i] ==
+              (layer_offsets[i]),
+          "layer {} wrong {} vs correct {}", i,
+          sid_thread_offsets_[galois::getActiveThreads() - 1][i],
+          layer_offsets[i]);
     }
   }
 
-  GALOIS_LOG_ASSERT(layer_offsets.back() == num_subgraph_nodes_);
+  // last element of prefix sum needs to equal the correct layer offset
+  galois::do_all(
+      galois::iterate(uint32_t{0},
+                      galois::runtime::getSystemNetworkInterface().Num),
+      [&](size_t host_num) {
+        // for each host, get prefix sum of each thread's mirrors
+        for (size_t thread_id = 1; thread_id < galois::getActiveThreads();
+             thread_id++) {
+          subgraph_mirror_offsets_[thread_id][host_num] +=
+              subgraph_mirror_offsets_[thread_id - 1][host_num];
+        }
+      });
+
+  // allocate the mirror space; last element of prefix sum is total size
+  for (unsigned host_num = 0;
+       host_num < galois::runtime::getSystemNetworkInterface().Num;
+       host_num++) {
+    if (galois::runtime::getSystemNetworkInterface().ID == host_num) {
+      continue;
+    }
+    subgraph_mirrors_[host_num].resize(
+        subgraph_mirror_offsets_[galois::getActiveThreads() - 1][host_num]);
+  }
+
+  galois::on_each([&](size_t thread_id, size_t num_threads) {
+    unsigned start_node;
+    unsigned end_node;
+    std::tie(start_node, end_node) = galois::block_range(
+        size_t{0}, gnn_graph.size(), thread_id, num_threads);
+
+    galois::PODResizeableArray<unsigned>& current_thread_offset =
+        thread_id != 0 ? sid_thread_offsets_[thread_id - 1] : thread_zero_work_;
+    galois::PODResizeableArray<unsigned>& my_mirror_offsets =
+        thread_id != 0 ? subgraph_mirror_offsets_[thread_id - 1]
+                       : thread_zero_mirror_offsets_;
+
+    for (size_t local_node_id = start_node; local_node_id < end_node;
+         local_node_id++) {
+      if (gnn_graph.IsActiveInSubgraph(local_node_id)) {
+        unsigned node_timestamp = gnn_graph.SampleNodeTimestamp(local_node_id);
+        if (node_timestamp != std::numeric_limits<unsigned>::max()) {
+          uint32_t sid_to_use;
+          if (node_timestamp != 0) {
+            sid_to_use = layer_offsets[node_timestamp - 1] +
+                         current_thread_offset[node_timestamp]++;
+            if (local_node_id < last_owned_node) {
+              // master node that is not in layer 0 (i.e. node_timestamp != 0)
+              non_layer_zero_masters.set(sid_to_use);
+            }
+          } else {
+            // node timestamp == 0; no layer offset needed because offset
+            // is 0
+            sid_to_use = current_thread_offset[node_timestamp]++;
+          }
+
+          // this is a mirror
+          if (local_node_id >= last_owned_node) {
+            // XXX(loc) mirror offsets
+            uint32_t node_gid = gnn_graph.GetGID(local_node_id);
+            size_t my_offset =
+                my_mirror_offsets[gnn_graph.GetHostID(node_gid)]++;
+
+            if (my_offset >
+                subgraph_mirrors_[gnn_graph.GetHostID(node_gid)].size())
+              GALOIS_LOG_FATAL(
+                  "{} {}", my_offset,
+                  subgraph_mirrors_[gnn_graph.GetHostID(node_gid)].size());
+
+            subgraph_mirrors_[gnn_graph.GetHostID(node_gid)][my_offset] =
+                node_gid;
+          }
+
+          subgraph_id_to_lid_[sid_to_use]    = local_node_id;
+          lid_to_subgraph_id_[local_node_id] = sid_to_use;
+        } else {
+          GALOIS_LOG_WARN("shouldn't ever get here right?");
+        }
+      }
+    }
+  });
+
   TimerStop(&timer);
 }
 
