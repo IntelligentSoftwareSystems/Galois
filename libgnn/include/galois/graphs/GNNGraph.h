@@ -397,6 +397,7 @@ public:
     }
     train_batcher_ = std::make_unique<MinibatchGenerator>(
         local_training_mask_, train_batch_size, *end_owned());
+    train_batcher_->ShuffleMode();
     local_minibatch_mask_.resize(partitioned_graph_->size());
   }
 

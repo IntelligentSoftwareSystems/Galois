@@ -1,7 +1,7 @@
 #include "galois/MinibatchGenerator.h"
 #include <cassert>
 
-void galois::MinibatchGenerator::GetNextMinibatch(
+void galois::MinibatchGenerator::OriginalGetNextMinibatch(
     std::vector<char>* batch_mask) {
   assert(current_position_ <= mask_to_minibatch_.size());
   assert(current_position_ <= master_bound_);
@@ -31,5 +31,17 @@ void galois::MinibatchGenerator::GetNextMinibatch(
   while (!mask_to_minibatch_[current_position_] &&
          (current_position_ < master_bound_)) {
     current_position_++;
+  }
+}
+
+void galois::MinibatchGenerator::ShuffleGetNextMinibatch(
+    std::vector<char>* batch_mask) {
+  size_t current_count = 0;
+  std::fill(batch_mask->begin(), batch_mask->end(), 0);
+  while (current_position_ < all_indices_.size()) {
+    (*batch_mask)[all_indices_[current_position_++]] = 1;
+    current_count++;
+    if (current_count == minibatch_size_)
+      break;
   }
 }
