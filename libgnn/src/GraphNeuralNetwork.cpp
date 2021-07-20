@@ -236,7 +236,7 @@ float galois::GraphNeuralNetwork::MinibatchedTesting() {
     }
   }
 
-  galois::gDebug("Minibatching Correct / Total ", correct, " ", total);
+  galois::gInfo("Minibatching Correct / Total ", correct, " ", total);
 
   if (choose_all_status) {
     graph_->EnableSubgraphChooseAll();
@@ -366,6 +366,8 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
 
       // create mini batch graphs and loop until minibatches on all hosts done
       while (true) {
+        galois::StatTimer prep_timer("PrepNextMinibatch", kRegionName);
+        galois::StatTimer sample_time("MinibatchSampling", kRegionName);
         galois::StatTimer mb_timer("MinibatchSubgraphCreation", kRegionName);
         mb_timer.start();
 
@@ -374,15 +376,18 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         work_left_.reset();
         galois::gInfo("Epoch ", epoch, " batch ", batch_num++);
         // break when all hosts are done with minibatches
+        prep_timer.start();
         size_t seed_node_count = graph_->PrepareNextTrainMinibatch();
         galois::gDebug(graph_->host_prefix(),
                        "Number of local seed nodes is for batch is ",
                        seed_node_count);
+        prep_timer.stop();
 
         // last layer input size/output rows becomes seed node size
         // gnn_layers_.back()->ResizeInputOutputRows(seed_node_count,
         //                                          seed_node_count);
 
+        sample_time.start(); 
         // +1 later in call because 0 is already taken
         size_t num_sampled_layers = 0;
         for (auto back_iter = gnn_layers_.rbegin();
@@ -414,6 +419,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
             num_sampled_layers++;
           }
         }
+        sample_time.stop(); 
 
         // resize layer matrices
         CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));

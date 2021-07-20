@@ -932,7 +932,7 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
                    } else {
                      UnsetSampledNode(*x);
                    }
-                 });
+                 }, galois::loopname("InitialSeedSetting"));
   // unsets nodes set in previous iterations; for some reason they get
   // synchronized along  with everything else even though bitset sample flag
   // should prevent it (that, or it's because they don't get sync'd that they
@@ -941,10 +941,13 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
                  [&](const NodeIterator& x) { UnsetSampledNode(*x); });
 
   // clear node timestamps
+  galois::StatTimer fill_time("ClearFillTime");
+  fill_time.start();
   std::fill(sample_node_timestamps_.begin(), sample_node_timestamps_.end(),
             std::numeric_limits<uint32_t>::max());
   std::fill(sample_master_offsets_.begin(), sample_master_offsets_.end(), 0);
   std::fill(sample_mirror_offsets_.begin(), sample_mirror_offsets_.end(), 0);
+  fill_time.stop();
 
   for (unsigned i = 0; i < master_offset_accum_.size(); i++) {
     master_offset_accum_[i].reset();
@@ -954,7 +957,8 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   // clear all sampled edges
   galois::do_all(
       galois::iterate(edge_sample_status_.begin(), edge_sample_status_.end()),
-      [&](galois::DynamicBitSet& edge_layer) { edge_layer.reset(); });
+      [&](galois::DynamicBitSet& edge_layer) { edge_layer.reset(); },
+      galois::loopname("ClearSampleEdges"));
 
   sampled_edges_.reset();
   // reset all degrees
@@ -962,8 +966,11 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
     galois::do_all(
         galois::iterate(sampled_out_degrees_),
         [&](galois::LargeArray<uint32_t>& array) {
-          std::fill(array.begin(), array.end(), 0);
+          memset(array.data(), 0, array.size() * sizeof(uint32_t))
+          //std::fill(array.begin(), array.end(), 0);
+          //std::fill(array.begin(), array.end(), 0);
         },
+        galois::loopname("ClearAllDegrees"),
         galois::chunk_size<1>());
   }
 
@@ -1001,7 +1008,8 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
       // 0 = seed node
       sample_node_timestamps_[*x] = 0;
     }
-  });
+  },
+  galois::loopname("SeedNodeOffsetCounting"));
 
   sample_master_offsets_[0] = master_offset.reduce();
   sample_mirror_offsets_[0] = mirror_offset.reduce();
@@ -1204,6 +1212,8 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
             "Ignore");
   }
 
+  galois::StatTimer offsets_n_rows_time("OffsetRowSubgraphTime");
+  offsets_n_rows_time.start();
   galois::do_all(galois::iterate(begin(), end()), [&](const NodeIterator& x) {
     if (IsActiveInSubgraph(*x)) {
       if (sample_node_timestamps_[*x] != std::numeric_limits<uint32_t>::max()) {
@@ -1219,7 +1229,9 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
             "should have been timestamped at some point if active");
       }
     }
-  });
+  },
+  galois::loopname("MasterMirrorOffset")
+  );
 
   std::vector<unsigned> new_rows(master_offset_accum_.size());
   for (unsigned i = 0; i < master_offset_accum_.size(); i++) {
@@ -1230,6 +1242,8 @@ galois::graphs::GNNGraph::ConstructSampledSubgraph(size_t num_sampled_layers,
       new_rows[i] += new_rows[i - 1];
     }
   }
+
+  offsets_n_rows_time.stop();
 
   if (!use_view) {
     subgraph_->BuildSubgraph(*this, num_sampled_layers);
