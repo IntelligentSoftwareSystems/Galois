@@ -23,6 +23,10 @@ add_executable(mkl_micro_dgalois mkl_micro.cpp)
 target_link_libraries(mkl_micro_dgalois galois_gnn)
 target_compile_definitions(mkl_micro_dgalois PUBLIC USE_DIST_GALOIS=1)
 
+add_executable(remapverify remapverify.cpp)
+target_link_libraries(remapverify galois_gnn)
+target_compile_definitions(remapverify PUBLIC USE_DIST_GALOIS=1)
+
 add_executable(mkl_micro_delete_galois mkl_micro.cpp)
 target_link_libraries(mkl_micro_delete_galois galois_gnn)
 target_compile_definitions(mkl_micro_delete_galois PUBLIC USE_SHARED_GALOIS_DELETE=1)
