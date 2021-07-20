@@ -109,6 +109,12 @@ public:
    */
   void reset() { std::fill(bitvec.begin(), bitvec.end(), 0); }
 
+  void ParallelReset() {
+    galois::do_all(
+        galois::iterate(bitvec),
+        [&](galois::CopyableAtomic<uint64_t>& to_reset) { to_reset = 0; });
+  }
+
   /**
    * Unset a range of bits given an inclusive range
    *

@@ -155,9 +155,10 @@ private:
       thread_zero_mirror_offsets_.resize(
           galois::runtime::getSystemNetworkInterface().Num);
     }
-    std::fill(thread_zero_work_.begin(), thread_zero_work_.end(), 0);
-    std::fill(thread_zero_mirror_offsets_.begin(),
-              thread_zero_mirror_offsets_.end(), 0);
+    galois::ParallelSTL::fill(thread_zero_work_.begin(),
+                              thread_zero_work_.end(), 0);
+    galois::ParallelSTL::fill(thread_zero_mirror_offsets_.begin(),
+                              thread_zero_mirror_offsets_.end(), 0);
   }
 
   //! Counts in and out degrees of all sampled nodes in the graph

@@ -39,8 +39,9 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
 
   assert(gnn_graph.size() == lid_to_subgraph_id_.size());
   // clear all mappings
-  std::fill(lid_to_subgraph_id_.begin(), lid_to_subgraph_id_.end(),
-            std::numeric_limits<uint32_t>::max());
+  galois::ParallelSTL::fill(lid_to_subgraph_id_.begin(),
+                            lid_to_subgraph_id_.end(),
+                            std::numeric_limits<uint32_t>::max());
 
   galois::GAccumulator<uint32_t> subgraph_count;
   subgraph_count.reset();

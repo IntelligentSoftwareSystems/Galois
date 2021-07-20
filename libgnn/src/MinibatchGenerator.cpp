@@ -1,4 +1,5 @@
 #include "galois/MinibatchGenerator.h"
+#include "galois/Galois.h"
 #include <cassert>
 
 void galois::MinibatchGenerator::OriginalGetNextMinibatch(
@@ -7,7 +8,7 @@ void galois::MinibatchGenerator::OriginalGetNextMinibatch(
   assert(current_position_ <= master_bound_);
   assert(batch_mask->size() == mask_to_minibatch_.size());
 
-  std::fill(batch_mask->begin(), batch_mask->end(), 0);
+  galois::ParallelSTL::fill(batch_mask->begin(), batch_mask->end(), 0);
   if (current_position_ >= master_bound_) {
     return;
   }
@@ -37,7 +38,7 @@ void galois::MinibatchGenerator::OriginalGetNextMinibatch(
 void galois::MinibatchGenerator::ShuffleGetNextMinibatch(
     std::vector<char>* batch_mask) {
   size_t current_count = 0;
-  std::fill(batch_mask->begin(), batch_mask->end(), 0);
+  galois::ParallelSTL::fill(batch_mask->begin(), batch_mask->end(), 0);
   while (current_position_ < all_indices_.size()) {
     (*batch_mask)[all_indices_[current_position_++]] = 1;
     current_count++;

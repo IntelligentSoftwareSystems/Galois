@@ -187,7 +187,7 @@ public:
   void insert(iterator GALOIS_USED_ONLY_IN_DEBUG(position), InputIterator first,
               InputIterator last) {
     assert(position == end());
-    size_t to_add   = last - first;
+    size_t to_add = last - first;
     if (to_add > 0) {
       size_t old_size = size_;
       resize(old_size + to_add);

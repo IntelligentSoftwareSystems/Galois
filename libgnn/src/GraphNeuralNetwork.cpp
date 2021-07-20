@@ -387,7 +387,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         // gnn_layers_.back()->ResizeInputOutputRows(seed_node_count,
         //                                          seed_node_count);
 
-        sample_time.start(); 
+        sample_time.start();
         // +1 later in call because 0 is already taken
         size_t num_sampled_layers = 0;
         for (auto back_iter = gnn_layers_.rbegin();
@@ -419,7 +419,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
             num_sampled_layers++;
           }
         }
-        sample_time.stop(); 
+        sample_time.stop();
 
         // resize layer matrices
         CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "gstl.h" 
-#include "PODResizeableArray.h" 
+#include "gstl.h"
+#include "PODResizeableArray.h"
 
 namespace galois {
 
@@ -27,18 +27,18 @@ public:
     assert(to_copy == fixed_vector_size_);
     size_t array_index = index * fixed_vector_size_;
     std::memcpy((void*)(&(underlying_memory_[array_index])),
-                (void*)to_copy.data(),
-                sizeof(T) * fixed_vector_size_);
+                (void*)to_copy.data(), sizeof(T) * fixed_vector_size_);
   }
 
   PODResizeableArray<T>& edit_data() { return underlying_memory_; }
   const PODResizeableArray<T>& data() { return underlying_memory_; }
   void resize(size_t s) { underlying_memory_.resize(s); }
   size_t size() const { return underlying_memory_.size(); }
+
 private:
   size_t num_elements_{0};
   size_t fixed_vector_size_{0};
   PODResizeableArray<T> underlying_memory_;
 };
 
-}
+} // namespace galois

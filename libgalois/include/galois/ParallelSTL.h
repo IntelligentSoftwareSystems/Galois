@@ -377,6 +377,12 @@ OutputIt partial_sum(InputIt first, InputIt last, OutputIt d_first) {
   }
 }
 
+template <class ForwardIt, class T>
+void fill(ForwardIt first, ForwardIt last, const T& value) {
+  galois::do_all(galois::iterate(first, last),
+                 [&](auto& iter) { iter = value; });
+}
+
 } // end namespace ParallelSTL
 } // end namespace galois
 #endif
