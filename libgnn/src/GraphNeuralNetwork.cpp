@@ -295,23 +295,28 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     // swap to train subgraph
     if (config_.use_train_subgraph_ && !config_.train_minibatch_size()) {
       graph_->EnableSubgraph();
-      size_t l_count = 0;
-      gnn_layers_.back()->ResizeRows(subgraph_layer_sizes[0]);
-      for (auto back_iter = gnn_layers_.rbegin();
-           back_iter != gnn_layers_.rend(); back_iter++) {
-        GNNLayerType layer_type = (*back_iter)->layer_type();
-        if (layer_type == GNNLayerType::kGraphConvolutional ||
-            layer_type == GNNLayerType::kSAGE) {
-          (*back_iter)
-              ->ResizeInputOutputRows(subgraph_layer_sizes[l_count + 1],
-                                      subgraph_layer_sizes[l_count]);
-          l_count++;
-        }
-      }
+      // TODO(loc) this doesn't actually function as expected anymore
+      // with the numerous changes to the system; this commenting
+      // out is more of a hack for the train subgraph option (which
+      // probably shouldn't be used anyways)
+
+      //size_t l_count = 0;
+      //gnn_layers_.back()->ResizeRows(subgraph_layer_sizes[0]);
+      //for (auto back_iter = gnn_layers_.rbegin();
+      //     back_iter != gnn_layers_.rend(); back_iter++) {
+      //  GNNLayerType layer_type = (*back_iter)->layer_type();
+      //  if (layer_type == GNNLayerType::kGraphConvolutional ||
+      //      layer_type == GNNLayerType::kSAGE) {
+      //    (*back_iter)
+      //        ->ResizeInputOutputRows(subgraph_layer_sizes[l_count + 1],
+      //                                subgraph_layer_sizes[l_count]);
+      //    l_count++;
+      //  }
+      //}
       CorrectBackwardLinks();
     }
 
-    // beginning of epoch sampling
+    // beginning of epoch sampling (no minibatches)
     if (config_.do_sampling() && !config_.train_minibatch_size()) {
       galois::StatTimer mb_timer("EpochSubgraphCreation", kRegionName);
       mb_timer.start();
@@ -398,6 +403,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
             // you can minibatch with sampling or minibatch and grab all
             // relevant neighbors
             size_t current_sample_size;
+
             if (config_.do_sampling()) {
               current_sample_size = graph_->SampleEdges(
                   (*back_iter)->graph_user_layer_number(),
@@ -408,10 +414,12 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
                   (*back_iter)->graph_user_layer_number(),
                   config_.inductive_subgraph_, num_sampled_layers + 1);
             }
+
             galois::gDebug(graph_->host_prefix(),
                            "Number of local nodes for layer ",
                            (*back_iter)->graph_user_layer_number(), " is ",
                            current_sample_size);
+
             // resize this layer, change seed node count
             //(*back_iter)
             //    ->ResizeInputOutputRows(current_sample_size, seed_node_count);
@@ -424,6 +432,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         // resize layer matrices
         CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));
         CorrectBackwardLinks();
+
         // XXX resizes above only work for SAGE layers; will break if other
         // layers are tested
 

@@ -32,7 +32,6 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
           }
         }
 
-        if (graph_.IsValidForPhase(i, layer_phase_)) {
           // do softmax
           GNNSoftmax(feature_length, &input_embeddings[feature_length * i],
                      &p_backward_output_matrix_[feature_length * i]);
@@ -53,10 +52,6 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
           loss_accum += input_loss_[i];
           handled += 1;
 #endif
-        } else {
-          VectorZero(feature_length,
-                     &p_backward_output_matrix_[i * feature_length]);
-        }
       },
       // TODO chunk size?
       // steal on as some threads may have nothing to work on
@@ -94,10 +89,8 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
   const size_t feature_length = layer_dimensions_.input_columns;
 
   galois::do_all(
-      // galois::iterate(graph_.begin(), graph_.end()),
       galois::iterate(size_t{0}, layer_dimensions_.input_rows),
       [&](const unsigned node) {
-        if (graph_.IsValidForPhase(node, layer_phase_)) {
           if (IsSampledLayer()) {
             if (layer_phase_ == GNNPhase::kTrain &&
                 !graph_.IsInSampledGraphSubgraph(node))
@@ -121,7 +114,6 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
                   p_backward_output_matrix_[node * feature_length + idx];
             }
           }
-        }
       },
       galois::steal(), galois::loopname("SoftmaxBackward"));
 

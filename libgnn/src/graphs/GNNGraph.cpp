@@ -994,11 +994,11 @@ size_t galois::graphs::GNNGraph::SetupNeighborhoodSample(GNNPhase seed_phase) {
   // Seed nodes sync
   if (use_timer_) {
     sync_substrate_
-        ->sync<writeSource, readSource, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeSource, readAny, SampleFlagSync, SampleFlagBitset>(
             "SeedNodeSample");
   } else {
     sync_substrate_
-        ->sync<writeSource, readSource, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeSource, readAny, SampleFlagSync, SampleFlagBitset>(
             "Ignore");
   }
 
@@ -1068,10 +1068,6 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
       },
       galois::steal(), galois::loopname("ChooseAllEdges"));
 
-  // galois::gPrint("Num sampled edges in inductive graph is ",
-  // sampled.reduce(),
-  //               " out of ", total.reduce(), "\n");
-
   // update nodes, then communicate update to all hosts so that they can
   // continue the exploration
   galois::do_all(
@@ -1085,11 +1081,11 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
 
   if (use_timer_) {
     sync_substrate_
-        ->sync<writeDestination, readSource, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
             "SampleFlag");
   } else {
     sync_substrate_
-        ->sync<writeDestination, readSource, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
             "Ignore");
   }
 
@@ -1100,8 +1096,6 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
     if (IsInSampledGraph(x)) {
       local_sample_count += 1;
       if (sample_node_timestamps_[*x] == std::numeric_limits<uint32_t>::max()) {
-        // galois::gInfo(host_prefix_, "Layer ", timestamp, " new node is ",
-        // GetGID(*x));
         sample_node_timestamps_[*x] = timestamp;
       }
     }
@@ -1182,11 +1176,11 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
   // correctly
   if (use_timer_) {
     sync_substrate_
-        ->sync<writeDestination, readSource, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
             "SampleFlag");
   } else {
     sync_substrate_
-        ->sync<writeDestination, readSource, SampleFlagSync, SampleFlagBitset>(
+        ->sync<writeDestination, readAny, SampleFlagSync, SampleFlagBitset>(
             "Ignore");
   }
 

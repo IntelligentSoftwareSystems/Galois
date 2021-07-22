@@ -79,6 +79,7 @@ public:
     }
   }
 
+  bool is_owned(size_t gid) const { return partitioned_graph_->isOwned(gid); }
   bool is_local(size_t gid) const { return partitioned_graph_->isLocal(gid); }
   size_t GetLID(size_t gid) const { return partitioned_graph_->getLID(gid); }
   size_t GetGID(size_t lid) const { return partitioned_graph_->getGID(lid); }

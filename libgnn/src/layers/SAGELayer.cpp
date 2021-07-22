@@ -155,16 +155,15 @@ void galois::SAGELayer::ResizeIntermediates(size_t new_input_rows,
                                             size_t new_output_rows) {
   size_t num_in_temp_elements =
       new_output_rows * layer_dimensions_.input_columns;
-  galois::gDebug("Layer num ", layer_number_, " ", in_temp_1_.size(), " and ",
-                 num_in_temp_elements, " ", layer_dimensions_.input_columns,
-                 " ", layer_dimensions_.output_columns);
+  galois::gDebug(graph_.host_prefix(), "Layer num ", layer_number_, " ",
+                 in_temp_1_.size(), " and ", num_in_temp_elements, " ",
+                 layer_dimensions_.input_columns, " ",
+                 layer_dimensions_.output_columns);
 
   // if in temp is smaller than out temp, or if dropout exists
   if (!config_.disable_dropout || config_.disable_aggregate_after_update ||
       layer_dimensions_.input_columns <= layer_dimensions_.output_columns) {
-    galois::gDebug("in first if");
     if (in_temp_1_.size() < num_in_temp_elements) {
-      galois::gDebug("in the resize");
       galois::gInfo(graph_.host_prefix(), "Resize layer ", layer_number_,
                     ", SAGE input temp var 1 ", num_in_temp_elements, " (",
                     FloatElementsToGB(num_in_temp_elements), " GB)");
@@ -237,6 +236,7 @@ void galois::SAGELayer::WeightGradientSyncSum2() {
   galois::StatTimer t("Sync_WeightGradientsSum2", kRegionName);
   TimerStart(&t);
   int weight_size = static_cast<int>(p_layer_weight_gradients_2_.size());
+
 #ifdef GALOIS_ENABLE_GPU
   bool gpu_direct_enabled = false;
   if (device_personality == DevicePersonality::GPU_CUDA &&
@@ -270,7 +270,8 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
   galois::gDebug(
       "Layer ", layer_number_, " dims: ", layer_dimensions_.input_rows, " ",
       layer_dimensions_.output_rows, " ", layer_dimensions_.input_columns, " ",
-      layer_dimensions_.output_columns);
+      layer_dimensions_.output_columns, " ", input_embeddings.size(), " ",
+      layer_dimensions_.input_rows * layer_dimensions_.input_columns);
   galois::StatTimer timer("ForwardPhase", kRegionName);
   TimerStart(&timer);
 
@@ -304,6 +305,7 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
       assert(p_in_temp_1_.size() >=
              layer_dimensions_.output_rows * layer_dimensions_.input_columns);
     }
+
     // aggregation and update
     AggregateAll(layer_dimensions_.input_columns, input_data, agg_data,
                  &input_column_intermediates_);
@@ -313,9 +315,11 @@ const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
   } else {
     assert(p_out_temp_.size() >=
            layer_dimensions_.input_rows * layer_dimensions_.output_columns);
+
     // update to aggregate
     // FW
     UpdateEmbeddings(input_data, p_out_temp_.data(), false);
+
     // A(FW)
     assert(p_forward_output_matrix_.size() >=
            layer_dimensions_.output_rows * layer_dimensions_.output_columns);
@@ -383,7 +387,6 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
   }
 
   if (!sage_config_.disable_concat) {
-    // XXX masking may not be required in sampling case where rows change
     if (layer_number_ != 0) {
       if (graph_.IsSubgraphOn()) {
         MaskInputNonMasters(&input_data, layer_dimensions_.input_rows,
@@ -422,6 +425,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
           input_data.data(), input_gradient->data(),
           p_layer_weight_gradients_2_.data());
       TimerStop(&concat_grad_timer);
+
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
@@ -443,8 +447,6 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
         MaskInputNonMasters(&agg_data, layer_dimensions_.output_rows);
       }
     }
-    // if concat is disabled, then input grad isn't masked; therefore, mask
-    // this to get the same effect
 
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
@@ -481,6 +483,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
       // weight matrix)
       UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data(),
                                  true);
+
       // pback contains F'
       // derivative of aggregate is the same due to symmetric graph
       AggregateAll(layer_dimensions_.input_columns, p_in_temp_1_.data(),
@@ -489,8 +492,9 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     }
   } else {
     // --unmasked--
-    // disable concat part is here because otherwise it would get done elsewhere
-    // XXX masking may not be required in sampling case where rows change
+
+    // disable concat is part of condition because otherwise this mask
+    // should have gotten done elsewhere
     if (layer_number_ != 0 && sage_config_.disable_concat) {
       if (graph_.IsSubgraphOn()) {
         MaskInputNonMasters(&input_data, layer_dimensions_.input_rows,
@@ -498,7 +502,11 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
       } else {
         MaskInputNonMasters(&input_data, layer_dimensions_.input_rows);
       }
-    } else {
+    }
+
+    // layer number 0 means output needs to be masked because input cannot
+    // be masked
+    if (layer_number_ == 0) {
       // if 0 then no input to mask: mask the gradient
       // this is fine because gradient won't be used to get feature gradients
       if (graph_.IsSubgraphOn()) {
@@ -532,6 +540,9 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     }
 #endif
 
+    // to get a correct result out temp mask cannot be masked;
+    // outtemp will only be masked if layer number is 0, so this
+    // is safe in all other cases
     if (layer_number_ != 0) {
       // derivative for update
       // backout = F'
