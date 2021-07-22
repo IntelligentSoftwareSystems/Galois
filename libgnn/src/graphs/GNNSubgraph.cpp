@@ -73,7 +73,7 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
   if (non_layer_zero_masters.size() < num_subgraph_nodes_) {
     non_layer_zero_masters.resize(num_subgraph_nodes_);
   } else {
-    non_layer_zero_masters.reset();
+    non_layer_zero_masters.ParallelReset();
   }
 
   std::vector<unsigned>& master_offsets = gnn_graph.GetMasterOffsets();
