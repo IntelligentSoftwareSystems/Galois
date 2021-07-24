@@ -391,7 +391,7 @@ public:
   //}
 
   //////////////////////////////////////////////////////////////////////////////
-  void SetupTrainBatcher(size_t train_batch_size) {
+  size_t SetupTrainBatcher(size_t train_batch_size) {
     if (train_batcher_) {
       // clear before remake
       train_batcher_.reset();
@@ -400,6 +400,7 @@ public:
         local_training_mask_, train_batch_size, *end_owned());
     train_batcher_->ShuffleMode();
     local_minibatch_mask_.resize(partitioned_graph_->size());
+    return train_batcher_->ShuffleMinibatchTotal();
   }
 
   void ResetTrainMinibatcher() { train_batcher_->ResetMinibatchState(); }
@@ -407,6 +408,10 @@ public:
   //! Setup the state for the next minibatch sampling call by using the
   //! minibatcher to pick up the next set batch of nodes
   size_t PrepareNextTrainMinibatch();
+  size_t PrepareNextTrainMinibatch(size_t num_to_get) {
+    train_batcher_->GetNextMinibatch(&local_minibatch_mask_, num_to_get);
+    return SetupNeighborhoodSample(GNNPhase::kBatch);
+  }
   //! Returns true if there are still more minibatches in this graph
   bool MoreTrainMinibatches() { return !train_batcher_->NoMoreMinibatches(); };
 

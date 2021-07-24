@@ -30,6 +30,15 @@ public:
     }
   }
 
+  void GetNextMinibatch(std::vector<char>* batch_mask, size_t num_to_get) {
+    if (!shuffle_mode_) {
+      // TODO
+      GALOIS_LOG_FATAL("not yet implemented");
+    } else {
+      ShuffleGetNextMinibatch(batch_mask, num_to_get);
+    }
+  }
+
   //! True if no more minibatches from this generator
   bool NoMoreMinibatches() {
     if (!shuffle_mode_) {
@@ -64,6 +73,16 @@ public:
     }
   }
 
+  //! Total number of nodes that can be minibatched by this minibatch
+  //! generator on this host
+  size_t ShuffleMinibatchTotal() {
+    if (shuffle_mode_) {
+      return all_indices_.size();
+    } else {
+      return 0;
+    }
+  }
+
 private:
   const GNNMask& mask_to_minibatch_;
   size_t minibatch_size_;
@@ -75,6 +94,8 @@ private:
 
   void OriginalGetNextMinibatch(std::vector<char>* batch_mask);
   void ShuffleGetNextMinibatch(std::vector<char>* batch_mask);
+  void ShuffleGetNextMinibatch(std::vector<char>* batch_mask,
+                               size_t num_to_get);
 };
 
 } // namespace galois

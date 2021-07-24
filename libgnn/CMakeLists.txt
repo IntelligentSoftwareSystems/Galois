@@ -1,4 +1,5 @@
 set(sources
+  src/DistributedMinibatchTracker.cpp
   src/GNNMath.cpp
   src/GNNOptimizers.cpp
   src/GraphNeuralNetwork.cpp

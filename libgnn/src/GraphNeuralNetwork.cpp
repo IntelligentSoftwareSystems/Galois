@@ -122,9 +122,17 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
                                    config_.use_train_subgraph_);
   }
 
+  num_hosts_ = galois::runtime::getSystemNetworkInterface().Num;
   if (config_.train_minibatch_size()) {
-    graph_->SetupTrainBatcher(config_.train_minibatch_size());
+    size_t local_num =
+        graph_->SetupTrainBatcher(config_.train_minibatch_size());
+    if (num_hosts_ > 1) {
+      dist_minibatch_tracker_ = std::make_unique<DistributedMinibatchTracker>(
+          galois::runtime::getSystemNetworkInterface().ID, num_hosts_,
+          local_num, config_.train_minibatch_size());
+    }
   }
+
   if (config_.test_minibatch_size()) {
     graph_->SetupTestBatcher(config_.test_minibatch_size());
   }
@@ -300,9 +308,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       // out is more of a hack for the train subgraph option (which
       // probably shouldn't be used anyways)
 
-      //size_t l_count = 0;
-      //gnn_layers_.back()->ResizeRows(subgraph_layer_sizes[0]);
-      //for (auto back_iter = gnn_layers_.rbegin();
+      // size_t l_count = 0;
+      // gnn_layers_.back()->ResizeRows(subgraph_layer_sizes[0]);
+      // for (auto back_iter = gnn_layers_.rbegin();
       //     back_iter != gnn_layers_.rend(); back_iter++) {
       //  GNNLayerType layer_type = (*back_iter)->layer_type();
       //  if (layer_type == GNNLayerType::kGraphConvolutional ||
@@ -365,6 +373,10 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       GradientPropagation();
     } else {
       graph_->ResetTrainMinibatcher();
+      if (num_hosts_ > 1) {
+        dist_minibatch_tracker_->ResetEpoch();
+      }
+
       SetLayerPhases(galois::GNNPhase::kBatch);
 
       size_t batch_num = 0;
@@ -382,7 +394,18 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         galois::gInfo("Epoch ", epoch, " batch ", batch_num++);
         // break when all hosts are done with minibatches
         prep_timer.start();
-        size_t seed_node_count = graph_->PrepareNextTrainMinibatch();
+        size_t seed_node_count;
+        if (num_hosts_ > 1) {
+          size_t num_for_next_batch =
+              dist_minibatch_tracker_->GetNumberForNextMinibatch();
+          galois::gInfo(graph_->host_prefix(), "Sampling ", num_for_next_batch,
+                        " for this minibatch");
+          seed_node_count =
+              graph_->PrepareNextTrainMinibatch(num_for_next_batch);
+        } else {
+          seed_node_count = graph_->PrepareNextTrainMinibatch();
+        }
+
         galois::gDebug(graph_->host_prefix(),
                        "Number of local seed nodes is for batch is ",
                        seed_node_count);
@@ -503,6 +526,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         epoch_timer.start();
 
         if (!global_work_left) {
+          if (num_hosts_ > 1) {
+            GALOIS_LOG_ASSERT(dist_minibatch_tracker_->OutOfWork());
+          }
           break;
         }
       }

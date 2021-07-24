@@ -8,6 +8,7 @@
 #include "galois/GNNOptimizers.h"
 #include "galois/graphs/GNNGraph.h"
 #include "galois/layers/GNNLayer.h"
+#include "galois/DistributedMinibatchTracker.h"
 
 #ifdef GALOIS_ENABLE_GPU
 #include "galois/GraphNeuralNetwork.cuh"
@@ -264,6 +265,9 @@ private:
 
   //! Termination detection for minibatching
   galois::DGAccumulator<uint32_t> work_left_;
+
+  size_t num_hosts_{0};
+  std::unique_ptr<galois::DistributedMinibatchTracker> dist_minibatch_tracker_;
 
 #ifdef GALOIS_ENABLE_GPU
   //! Holds all GPU functions

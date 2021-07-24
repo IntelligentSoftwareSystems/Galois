@@ -46,3 +46,15 @@ void galois::MinibatchGenerator::ShuffleGetNextMinibatch(
       break;
   }
 }
+
+void galois::MinibatchGenerator::ShuffleGetNextMinibatch(
+    std::vector<char>* batch_mask, size_t num_to_get) {
+  size_t current_count = 0;
+  galois::ParallelSTL::fill(batch_mask->begin(), batch_mask->end(), 0);
+  while (current_position_ < all_indices_.size()) {
+    (*batch_mask)[all_indices_[current_position_++]] = 1;
+    current_count++;
+    if (current_count == num_to_get)
+      break;
+  }
+}
