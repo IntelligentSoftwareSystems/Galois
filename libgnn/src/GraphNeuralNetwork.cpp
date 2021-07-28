@@ -526,9 +526,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         epoch_timer.start();
 
         if (!global_work_left) {
-          if (num_hosts_ > 1) {
-            GALOIS_LOG_ASSERT(dist_minibatch_tracker_->OutOfWork());
-          }
+          // if (num_hosts_ > 1) {
+          //  GALOIS_LOG_ASSERT(dist_minibatch_tracker_->OutOfWork());
+          //}
           break;
         }
       }

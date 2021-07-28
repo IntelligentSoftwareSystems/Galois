@@ -12,11 +12,13 @@ class DistributedMinibatchTracker {
 public:
   DistributedMinibatchTracker(size_t my_host_id, size_t num_hosts,
                               size_t my_minibatch_nodes,
-                              size_t total_minibatch_size)
+                              size_t local_minibatch_size)
       : my_host_id_{my_host_id}, num_hosts_{num_hosts},
-        total_minibatch_size_{total_minibatch_size}, complete_hosts_{0},
-        rng_object_{(long unsigned)rand() * (my_host_id_ + 1)},
-        int_distribution_{0, (unsigned)num_hosts_ - 1} {
+        local_minibatch_size_{local_minibatch_size},
+        total_minibatch_size_{local_minibatch_size_ * num_hosts_},
+        complete_hosts_{0}, rng_object_{(long unsigned)rand() *
+                                        (my_host_id_ + 1)},
+        int_distribution_{1, 10} {
     max_num_on_hosts_.resize(num_hosts_, 0);
     current_num_on_hosts_.resize(num_hosts_, 0);
     sampled_num_on_hosts_.resize(num_hosts_, 0);
@@ -40,11 +42,15 @@ public:
 
   size_t GetNumberForNextMinibatch();
 
-  bool OutOfWork() { return complete_hosts_ == num_hosts_; }
+  bool OutOfWork() {
+    GALOIS_LOG_FATAL("NEED TO IMPLEMENT");
+    return complete_hosts_ == num_hosts_;
+  }
 
 private:
   size_t my_host_id_;
   size_t num_hosts_;
+  size_t local_minibatch_size_;
   size_t total_minibatch_size_;
   unsigned complete_hosts_;
 
