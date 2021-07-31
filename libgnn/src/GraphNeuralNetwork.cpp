@@ -124,13 +124,13 @@ galois::GraphNeuralNetwork::GraphNeuralNetwork(
 
   num_hosts_ = galois::runtime::getSystemNetworkInterface().Num;
   if (config_.train_minibatch_size()) {
-    size_t local_num =
-        graph_->SetupTrainBatcher(config_.train_minibatch_size());
-    if (num_hosts_ > 1) {
-      dist_minibatch_tracker_ = std::make_unique<DistributedMinibatchTracker>(
-          galois::runtime::getSystemNetworkInterface().ID, num_hosts_,
-          local_num, config_.train_minibatch_size());
-    }
+    graph_->SetupTrainBatcher(config_.train_minibatch_size());
+    // size_t local_num =
+    // if (num_hosts_ > 1) {
+    //  dist_minibatch_tracker_ = std::make_unique<DistributedMinibatchTracker>(
+    //      galois::runtime::getSystemNetworkInterface().ID, num_hosts_,
+    //      local_num, config_.train_minibatch_size());
+    //}
   }
 
   if (config_.test_minibatch_size()) {
@@ -373,9 +373,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
       GradientPropagation();
     } else {
       graph_->ResetTrainMinibatcher();
-      if (num_hosts_ > 1) {
-        dist_minibatch_tracker_->ResetEpoch();
-      }
+      // if (num_hosts_ > 1) {
+      //  dist_minibatch_tracker_->ResetEpoch();
+      //}
 
       SetLayerPhases(galois::GNNPhase::kBatch);
 
@@ -395,16 +395,17 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         // break when all hosts are done with minibatches
         prep_timer.start();
         size_t seed_node_count;
-        if (num_hosts_ > 1) {
-          size_t num_for_next_batch =
-              dist_minibatch_tracker_->GetNumberForNextMinibatch();
-          galois::gInfo(graph_->host_prefix(), "Sampling ", num_for_next_batch,
-                        " for this minibatch");
-          seed_node_count =
-              graph_->PrepareNextTrainMinibatch(num_for_next_batch);
-        } else {
-          seed_node_count = graph_->PrepareNextTrainMinibatch();
-        }
+        // if (num_hosts_ > 1) {
+        //  size_t num_for_next_batch =
+        //      dist_minibatch_tracker_->GetNumberForNextMinibatch();
+        //  galois::gInfo(graph_->host_prefix(), "Sampling ",
+        //  num_for_next_batch,
+        //                " for this minibatch");
+        //  seed_node_count =
+        //      graph_->PrepareNextTrainMinibatch(num_for_next_batch);
+        //} else {
+        //}
+        seed_node_count = graph_->PrepareNextTrainMinibatch();
 
         galois::gDebug(graph_->host_prefix(),
                        "Number of local seed nodes is for batch is ",

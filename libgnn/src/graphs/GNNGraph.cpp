@@ -490,6 +490,11 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
   // read mask range
   std::string mask_filename =
       input_directory_ + dataset_name + "-" + mask_type + "_mask.txt";
+  bool train_is_on = false;
+  if (mask_type == "train") {
+    train_is_on = true;
+  }
+
   std::ifstream mask_stream;
   mask_stream.open(mask_filename, std::ios::in);
   mask_stream >> range_begin >> range_end >> std::ws;
@@ -519,6 +524,9 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
         if (partitioned_graph_->isLocal(cur_line_num)) {
           (*masks)[partitioned_graph_->getLID(cur_line_num)] = 1;
           local_sample_count++;
+        }
+        if (train_is_on) {
+          global_training_mask_[cur_line_num] = 1;
         }
       }
     }
@@ -560,6 +568,7 @@ size_t galois::graphs::GNNGraph::FindOtherMask() {
 
 void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
   // allocate the memory for the local masks
+  global_training_mask_.resize(partitioned_graph_->globalSize());
   local_training_mask_.resize(partitioned_graph_->size());
   local_validation_mask_.resize(partitioned_graph_->size());
   local_testing_mask_.resize(partitioned_graph_->size());
@@ -579,6 +588,7 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
       if (partitioned_graph_->isLocal(i)) {
         local_training_mask_[partitioned_graph_->getLID(i)] = 1;
       }
+      global_training_mask_[i] = 1;
     }
 
     // validation
@@ -608,6 +618,7 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
       if (partitioned_graph_->isLocal(i)) {
         local_training_mask_[partitioned_graph_->getLID(i)] = 1;
       }
+      global_training_mask_[i] = 1;
     }
     // validation
     for (size_t i = global_validation_mask_range_.begin;

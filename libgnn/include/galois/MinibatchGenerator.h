@@ -2,6 +2,7 @@
 
 #include "galois/GNNTypes.h"
 #include "galois/Logging.h"
+#include "galois/graphs/DistributedGraph.h"
 #include <ctime>
 #include <random>
 #include <algorithm>
@@ -17,8 +18,9 @@ public:
       : mask_to_minibatch_{mask_to_minibatch}, minibatch_size_{minibatch_size},
         current_position_{0}, master_bound_{master_bound} {
     // set seed based on time then initialize random generate with rand()
-    srand(time(NULL));
+    srand(1);
     rand_generator_ = std::make_unique<std::mt19937>(rand());
+    srand(time(NULL));
     GALOIS_LOG_ASSERT(master_bound_ <= mask_to_minibatch_.size());
   }
 
@@ -56,16 +58,24 @@ public:
     }
   }
 
-  void ShuffleMode() {
+  void ShuffleMode(const galois::graphs::DistGraph<char, void>& graph,
+                   GNNMask& global_training_mask, size_t total_train_nodes) {
     if (!shuffle_mode_) {
       shuffle_mode_ = true;
-      all_indices_.reserve(master_bound_);
+      all_indices_.reserve(total_train_nodes);
       // setup all set indices for the minibatch
-      for (size_t pos = 0; pos < master_bound_; pos++) {
-        if (mask_to_minibatch_[pos]) {
-          all_indices_.emplace_back(pos);
+      for (size_t pos = 0; pos < global_training_mask.size(); pos++) {
+        if (global_training_mask[pos]) {
+          if (graph.isLocal(pos)) {
+            all_indices_.emplace_back(graph.getLID(pos));
+          } else {
+            // size is greater than LID; use this as a "not present"
+            all_indices_.emplace_back(graph.size());
+          }
         }
       }
+      GALOIS_LOG_ASSERT(all_indices_.size() == total_train_nodes);
+
       // shuffle it
       std::shuffle(all_indices_.begin(), all_indices_.end(), *rand_generator_);
       printf("Number of things in minibatch generator is %lu\n",

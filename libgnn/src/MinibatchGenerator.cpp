@@ -37,12 +37,19 @@ void galois::MinibatchGenerator::OriginalGetNextMinibatch(
 
 void galois::MinibatchGenerator::ShuffleGetNextMinibatch(
     std::vector<char>* batch_mask) {
-  size_t current_count = 0;
   galois::ParallelSTL::fill(batch_mask->begin(), batch_mask->end(), 0);
+
+  size_t current_count = 0;
+  size_t global_minibatch_size =
+      minibatch_size_ * galois::runtime::getSystemNetworkInterface().Num;
   while (current_position_ < all_indices_.size()) {
-    (*batch_mask)[all_indices_[current_position_++]] = 1;
+    size_t candidate_lid = all_indices_[current_position_++];
+    if (candidate_lid < batch_mask->size() && candidate_lid < master_bound_) {
+      (*batch_mask)[candidate_lid] = 1;
+    }
+
     current_count++;
-    if (current_count == minibatch_size_)
+    if (current_count == global_minibatch_size)
       break;
   }
 }
