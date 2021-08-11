@@ -74,7 +74,9 @@ public:
           }
         }
       }
-      GALOIS_LOG_ASSERT(all_indices_.size() == total_train_nodes);
+      GALOIS_LOG_VASSERT(all_indices_.size() == total_train_nodes,
+                         "{} vs right {}", all_indices_.size(),
+                         total_train_nodes);
 
       // shuffle it
       std::shuffle(all_indices_.begin(), all_indices_.end(), *rand_generator_);

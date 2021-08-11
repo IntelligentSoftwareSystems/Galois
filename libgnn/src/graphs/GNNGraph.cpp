@@ -534,6 +534,10 @@ size_t galois::graphs::GNNGraph::ReadLocalMasksFromFile(
   }
   mask_stream.close();
 
+  if (train_is_on) {
+    global_training_count_ = valid_count;
+  }
+
   if (valid_count != mask_range->size) {
     // overlapping masks: need to actually check the masks rather than use
     // ranges
@@ -574,6 +578,8 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
   local_testing_mask_.resize(partitioned_graph_->size());
 
   if (dataset_name == "reddit") {
+    global_training_count_ = 153431;
+
     // TODO reddit is hardcode handled at the moment; better way to not do
     // this?
     global_training_mask_range_   = {.begin = 0, .end = 153431, .size = 153431};
@@ -607,6 +613,8 @@ void galois::graphs::GNNGraph::ReadLocalMasks(const std::string& dataset_name) {
       }
     }
   } else if (dataset_name == "ogbn-papers100M-remap") {
+    global_training_count_ = 1207178;
+
     global_training_mask_range_ = {.begin = 0, .end = 1207178, .size = 1207178};
     global_validation_mask_range_ = {
         .begin = 1207178, .end = 1207178 + 125264, .size = 125264};
@@ -1107,6 +1115,14 @@ size_t galois::graphs::GNNGraph::SampleAllEdges(size_t agg_layer_num,
     if (IsInSampledGraph(x)) {
       local_sample_count += 1;
       if (sample_node_timestamps_[*x] == std::numeric_limits<uint32_t>::max()) {
+        if (x < end_owned()) {
+          // owned nodes that are activated on other hosts shoudl always
+          // be activated because it's responsible for keeping others in
+          // sync during comms; ignoring it = bad
+          // TODO(gluon) make it so you don't have to deal with this
+          // and just use host as a reducer point
+          definitely_sampled_nodes_.set(*x);
+        }
         sample_node_timestamps_[*x] = timestamp;
       }
     }
@@ -1203,6 +1219,14 @@ size_t galois::graphs::GNNGraph::SampleEdges(size_t sample_layer_num,
     if (IsInSampledGraph(x)) {
       local_sample_count += 1;
       if (sample_node_timestamps_[*x] == std::numeric_limits<uint32_t>::max()) {
+        if (x < end_owned()) {
+          // owned nodes that are activated on other hosts shoudl always
+          // be activated because it's responsible for keeping others in
+          // sync during comms; ignoring it = bad
+          // TODO(gluon) make it so you don't have to deal with this
+          // and just use host as a reducer point
+          definitely_sampled_nodes_.set(*x);
+        }
         sample_node_timestamps_[*x] = timestamp;
       }
     }

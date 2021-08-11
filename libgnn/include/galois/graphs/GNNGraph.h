@@ -399,7 +399,7 @@ public:
     train_batcher_ = std::make_unique<MinibatchGenerator>(
         local_training_mask_, train_batch_size, *end_owned());
     train_batcher_->ShuffleMode(*partitioned_graph_, global_training_mask_,
-                                global_training_mask_range_.size);
+                                global_training_count_);
     local_minibatch_mask_.resize(partitioned_graph_->size());
     return train_batcher_->ShuffleMinibatchTotal();
   }
@@ -778,6 +778,7 @@ private:
   //////////////////////////////////////////////////////////////////////////////
 
   // TODO maybe revisit this and use an actual bitset
+  size_t global_training_count_;
   //! Bitset indicating which nodes are training nodes (global)
   GNNMask global_training_mask_;
   //! Bitset indicating which nodes are training nodes

@@ -59,6 +59,27 @@ void galois::graphs::GNNGraph::GNNSubgraph::CreateSubgraphMapping(
     return;
   }
 
+  // checking sanity
+  // galois::do_all(galois::iterate(gnn_graph.begin(), gnn_graph.end()),
+  //               [&](uint32_t node_id) {
+  //                 if (gnn_graph.IsInSampledGraph(node_id) &&
+  //                 !gnn_graph.IsActiveInSubgraph(node_id)) {
+  //                  // check if any edges are active
+  //                  for (auto a = gnn_graph.edge_begin(node_id); a !=
+  //                  gnn_graph.edge_end(node_id);a++) {
+  //                    if (gnn_graph.IsEdgeSampledAny(a)) {
+  //                      galois::gWarn("ERROR node ", node_id);
+  //                    }
+  //                  }
+  //                  for (auto a = gnn_graph.in_edge_begin(node_id); a !=
+  //                  gnn_graph.in_edge_end(node_id);a++) {
+  //                    if (gnn_graph.IsInEdgeSampledAny(a)) {
+  //                      galois::gWarn("ERROR in node ", node_id);
+  //                    }
+  //                  }
+  //                 }
+  //               });
+
   if (subgraph_id_to_lid_.size() < num_subgraph_nodes_) {
     // allocate a bit more than necessary to avoid a big realloc
     // if node value changes slightly later
