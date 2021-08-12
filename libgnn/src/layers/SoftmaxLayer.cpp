@@ -32,25 +32,25 @@ galois::SoftmaxLayer::ForwardPhaseCPU(
           }
         }
 
-          // do softmax
-          GNNSoftmax(feature_length, &input_embeddings[feature_length * i],
-                     &p_backward_output_matrix_[feature_length * i]);
-          // create ground truth vector for this LID
-          std::vector<GNNFloat>* ground_truth_vec =
-              ground_truth_vectors_.getLocal();
-          assert(ground_truth_vec->size() == feature_length);
-          ground_truth_vec->assign(ground_truth_vec->size(), 0.0);
-          // single class label is an index; set the correct one
-          (*ground_truth_vec)[static_cast<size_t>(
-              graph_.GetSingleClassLabel(i))] = 1.0;
+        // do softmax
+        GNNSoftmax(feature_length, &input_embeddings[feature_length * i],
+                   &p_backward_output_matrix_[feature_length * i]);
+        // create ground truth vector for this LID
+        std::vector<GNNFloat>* ground_truth_vec =
+            ground_truth_vectors_.getLocal();
+        assert(ground_truth_vec->size() == feature_length);
+        ground_truth_vec->assign(ground_truth_vec->size(), 0.0);
+        // single class label is an index; set the correct one
+        (*ground_truth_vec)[static_cast<size_t>(
+            graph_.GetSingleClassLabel(i))] = 1.0;
 
-          // calculate loss for this LID (note not all i will be filled)
-          input_loss_[i] =
-              GNNCrossEntropy(feature_length, ground_truth_vec->data(),
-                              &p_backward_output_matrix_[feature_length * i]);
+        // calculate loss for this LID (note not all i will be filled)
+        input_loss_[i] =
+            GNNCrossEntropy(feature_length, ground_truth_vec->data(),
+                            &p_backward_output_matrix_[feature_length * i]);
 #ifndef NDEBUG
-          loss_accum += input_loss_[i];
-          handled += 1;
+        loss_accum += input_loss_[i];
+        handled += 1;
 #endif
       },
       // TODO chunk size?
@@ -91,29 +91,29 @@ galois::SoftmaxLayer::BackwardPhaseCPU() {
   galois::do_all(
       galois::iterate(size_t{0}, layer_dimensions_.input_rows),
       [&](const unsigned node) {
-          if (IsSampledLayer()) {
-            if (layer_phase_ == GNNPhase::kTrain &&
-                !graph_.IsInSampledGraphSubgraph(node))
-              return;
-          }
+        if (IsSampledLayer()) {
+          if (layer_phase_ == GNNPhase::kTrain &&
+              !graph_.IsInSampledGraphSubgraph(node))
+            return;
+        }
 
-          size_t correct = graph_.GetSingleClassLabel(node);
-          // See here for explanation for why this works
-          // https://gombru.github.io/2018/05/23/cross_entropy_loss/
-          // Derivation of full combined derivative isn't there, but some
-          // emperical inspection tells me this is likely correct
-          // TODO(loc) work it out myself
-          for (size_t idx = 0; idx < feature_length; idx++) {
-            if (idx == correct) {
-              // positive class
-              p_backward_output_matrix_[node * feature_length + idx] =
-                  p_backward_output_matrix_[node * feature_length + idx] - 1;
-            } else {
-              // negative class
-              p_backward_output_matrix_[node * feature_length + idx] =
-                  p_backward_output_matrix_[node * feature_length + idx];
-            }
+        size_t correct = graph_.GetSingleClassLabel(node);
+        // See here for explanation for why this works
+        // https://gombru.github.io/2018/05/23/cross_entropy_loss/
+        // Derivation of full combined derivative isn't there, but some
+        // emperical inspection tells me this is likely correct
+        // TODO(loc) work it out myself
+        for (size_t idx = 0; idx < feature_length; idx++) {
+          if (idx == correct) {
+            // positive class
+            p_backward_output_matrix_[node * feature_length + idx] =
+                p_backward_output_matrix_[node * feature_length + idx] - 1;
+          } else {
+            // negative class
+            p_backward_output_matrix_[node * feature_length + idx] =
+                p_backward_output_matrix_[node * feature_length + idx];
           }
+        }
       },
       galois::steal(), galois::loopname("SoftmaxBackward"));
 

@@ -155,7 +155,7 @@ void galois::SAGELayer::ResizeIntermediates(size_t new_input_rows,
                                             size_t new_output_rows) {
   size_t num_in_temp_elements =
       new_output_rows * layer_dimensions_.input_columns;
-  //galois::gDebug(graph_.host_prefix(), "Layer num ", layer_number_, " ",
+  // galois::gDebug(graph_.host_prefix(), "Layer num ", layer_number_, " ",
   //               in_temp_1_.size(), " and ", num_in_temp_elements, " ",
   //               layer_dimensions_.input_columns, " ",
   //               layer_dimensions_.output_columns);
@@ -267,10 +267,10 @@ void galois::SAGELayer::WeightGradientSyncSum2() {
 
 const galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::ForwardPhase(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
-  //galois::gDebug(
+  // galois::gDebug(
   //    "Layer ", layer_number_, " dims: ", layer_dimensions_.input_rows, " ",
-  //    layer_dimensions_.output_rows, " ", layer_dimensions_.input_columns, " ",
-  //    layer_dimensions_.output_columns, " ", input_embeddings.size(), " ",
+  //    layer_dimensions_.output_rows, " ", layer_dimensions_.input_columns, "
+  //    ", layer_dimensions_.output_columns, " ", input_embeddings.size(), " ",
   //    layer_dimensions_.input_rows * layer_dimensions_.input_columns);
   galois::StatTimer timer("ForwardPhase", kRegionName);
   TimerStart(&timer);
@@ -742,7 +742,7 @@ void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
         base_gpu_object_.layer_weights(), output);
   } else {
 #endif
-    //galois::gDebug("Layer ", graph_user_layer_number_, " ",
+    // galois::gDebug("Layer ", graph_user_layer_number_, " ",
     //               layer_dimensions_.output_rows, " ",
     //               layer_dimensions_.input_columns, " ",
     //               layer_dimensions_.output_columns);

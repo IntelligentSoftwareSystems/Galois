@@ -7,6 +7,10 @@
 const galois::PointerWithSize<galois::GNNFloat>
 galois::SigmoidLayer::ForwardPhaseCPU(
     const galois::PointerWithSize<galois::GNNFloat> input_embeddings) {
+  galois::gWarn(
+      "Sigmoid layer has not been kept up to date; do not use unless sure"
+      " it works with new changes");
+
   input_loss_.assign(input_loss_.size(), 0.0);
   forward_output_matrix_.assign(forward_output_matrix_.size(), 0.0);
   const size_t feature_length = layer_dimensions_.input_columns;

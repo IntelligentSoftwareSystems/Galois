@@ -189,7 +189,7 @@ void galois::GNNLayer::RandomInitVector(std::vector<GNNFloat>* vector_to_init) {
 void galois::GNNLayer::DoDropoutCPU(
     const PointerWithSize<GNNFloat> input_to_dropout,
     PointerWithSize<GNNFloat>* output_matrix) {
-  // XXX(loc) check this to make sure it works in subgraph setting
+  // TODO This (and dropout in general) may not work in the sampling setting
   size_t num_elements =
       layer_dimensions_.input_rows * layer_dimensions_.input_columns;
 

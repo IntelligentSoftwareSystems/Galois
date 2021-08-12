@@ -9,6 +9,10 @@ galois::GraphConvolutionalLayer::GraphConvolutionalLayer(
     : GNNLayer(layer_num, graph, backward_output_matrix, dimensions, config),
       input_column_intermediates_(dimensions.input_columns),
       output_column_intermediates_(dimensions.output_columns) {
+  galois::gWarn(
+      "GCN layer not up to date with new subgraph/sampling changes; "
+      "do not use until updated to reflect changes (see GraphSAGE layer)");
+
   size_t num_input_elements =
       layer_dimensions_.input_rows * layer_dimensions_.input_columns;
   if (!config_.disable_dropout || config_.disable_aggregate_after_update ||

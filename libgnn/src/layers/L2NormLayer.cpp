@@ -5,6 +5,8 @@ galois::L2NormLayer::ForwardPhase(
 #ifdef GALOIS_ENABLE_GPU
   // TODO
 #endif
+  GALOIS_LOG_FATAL(
+      "L2 layer has not been kept up to date for months; do not use");
   return ForwardPhaseCPU(input_embeddings);
 }
 

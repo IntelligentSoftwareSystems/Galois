@@ -9,6 +9,10 @@ galois::DenseLayer::DenseLayer(
     : GNNLayer(layer_num, graph, backward_output_matrix, dimensions, config),
       input_column_intermediates_(dimensions.input_columns),
       output_column_intermediates_(dimensions.output_columns) {
+  // TODO Need to make sure that layer knows about forward/backward matrix
+  // sharing (e.g., overwriting previously used input to save space)
+  GALOIS_LOG_FATAL("This layer has not been kept up to date; do not use until "
+                   "sure it's been updated");
   size_t num_input_elements =
       layer_dimensions_.input_rows * layer_dimensions_.input_columns;
   in_temp_1_.resize(num_input_elements, 0);
