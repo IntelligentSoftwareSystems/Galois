@@ -37,6 +37,22 @@ void galois::MinibatchGenerator::OriginalGetNextMinibatch(
 
 void galois::MinibatchGenerator::ShuffleGetNextMinibatch(
     std::vector<char>* batch_mask) {
+  size_t current_count = 0;
+  galois::ParallelSTL::fill(batch_mask->begin(), batch_mask->end(), 0);
+  // loops through a number of indices locally and sets
+  while (current_position_ < all_indices_.size()) {
+    (*batch_mask)[all_indices_[current_position_++]] = 1;
+    current_count++;
+    if (current_count == minibatch_size_)
+      break;
+  }
+}
+
+// used if all hosts have a global view of the same minibatch sequence
+// (occurs if all hosts use same shuffle seed)
+// Do not use unless you know what you are doing
+void galois::MinibatchGenerator::DistributedShuffleGetNextMinibatch(
+    std::vector<char>* batch_mask) {
   galois::ParallelSTL::fill(batch_mask->begin(), batch_mask->end(), 0);
 
   size_t current_count = 0;
@@ -54,7 +70,9 @@ void galois::MinibatchGenerator::ShuffleGetNextMinibatch(
   }
 }
 
-void galois::MinibatchGenerator::ShuffleGetNextMinibatch(
+// used with distributed minibatch tracker which is deprecated; code not
+// guaranteed to work
+void galois::MinibatchGenerator::DistributedShuffleGetNextMinibatch(
     std::vector<char>* batch_mask, size_t num_to_get) {
   size_t current_count = 0;
   galois::ParallelSTL::fill(batch_mask->begin(), batch_mask->end(), 0);

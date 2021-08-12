@@ -398,8 +398,9 @@ public:
     }
     train_batcher_ = std::make_unique<MinibatchGenerator>(
         local_training_mask_, train_batch_size, *end_owned());
-    train_batcher_->ShuffleMode(*partitioned_graph_, global_training_mask_,
-                                global_training_count_);
+    train_batcher_->ShuffleMode();
+    // train_batcher_->DistributedShuffleMode(*partitioned_graph_,
+    // global_training_mask_, global_training_count_);
     local_minibatch_mask_.resize(partitioned_graph_->size());
     return train_batcher_->ShuffleMinibatchTotal();
   }
@@ -409,10 +410,11 @@ public:
   //! Setup the state for the next minibatch sampling call by using the
   //! minibatcher to pick up the next set batch of nodes
   size_t PrepareNextTrainMinibatch();
-  size_t PrepareNextTrainMinibatch(size_t num_to_get) {
-    train_batcher_->GetNextMinibatch(&local_minibatch_mask_, num_to_get);
-    return SetupNeighborhoodSample(GNNPhase::kBatch);
-  }
+  // Used with distributed minibatch tracker
+  // size_t PrepareNextTrainMinibatch(size_t num_to_get) {
+  //  train_batcher_->GetNextMinibatch(&local_minibatch_mask_, num_to_get);
+  //  return SetupNeighborhoodSample(GNNPhase::kBatch);
+  //}
   //! Returns true if there are still more minibatches in this graph
   bool MoreTrainMinibatches() { return !train_batcher_->NoMoreMinibatches(); };
 
