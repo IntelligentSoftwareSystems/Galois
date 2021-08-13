@@ -375,6 +375,7 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
   }
 
   // aggregate this here before gradient starts to get overwritten
+  // this is xform ffirst
   if (!config_.disable_aggregate_after_update &&
       layer_dimensions_.input_columns > layer_dimensions_.output_columns) {
     // aggregate occurs regardless of layer being equal to 0 because it is
@@ -491,6 +492,8 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
                    &input_column_intermediates_, true);
     }
   } else {
+    // xform first
+
     // --unmasked--
 
     // disable concat is part of condition because otherwise this mask
