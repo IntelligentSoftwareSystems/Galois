@@ -268,7 +268,7 @@ void parallel_make_balance(GGraph& g, float tol, int p) {
                 int d   = gain * 10.0f;
                 int idx = 10 - d;
                 nodelistz[idx].push(n);
-              } else if (gain >= -9.0f) {
+              } else if (gain > -9.0f) {
                 int d   = gain * 10.0f - 1;
                 int idx = 10 - d;
                 nodelistz[idx].push(n);
