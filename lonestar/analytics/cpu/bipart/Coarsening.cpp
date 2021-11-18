@@ -29,7 +29,7 @@
 #include <unordered_set>
 #include <unordered_map>
 
-constexpr static const unsigned CHUNK_SIZE = 512U;
+// constexpr static const unsigned CHUNK_SIZE = 512U;
 
 int TOTALW;
 int LIMIT;
@@ -56,7 +56,7 @@ void parallelRand(MetisGraph* graph, int) {
         fineGGraph->getData(item, flag_no_lock).netrand = netnum;
       },
       galois::steal(),
-      //			 galois::chunk_size<CHUNK_SIZE>());
+      // galois::chunk_size<CHUNK_SIZE>());
       galois::loopname("rand"));
   T_RAND.stop();
 
@@ -72,7 +72,7 @@ void parallelRand(MetisGraph* graph, int) {
         fineGGraph->getData(item, flag_no_lock).index = netnum;
       },
       galois::steal(),
-      //		 galois::chunk_size<CHUNK_SIZE>());
+      // galois::chunk_size<CHUNK_SIZE>());
       galois::loopname("rand_index"));
   T_INDEX.stop();
 
