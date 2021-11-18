@@ -24,8 +24,10 @@ struct multiple_sum {
   T el[items];
 
   // https://nvlabs.github.io/cub/classcub_1_1_block_scan.html#a6ed3f77795e582df31d3d6d9d950615e
-  // "This operation assumes the value of obtained by the T's default constructor (or by zero-initialization if no user-defined default constructor exists) is suitable as the identity value zero for addition."
-  __device__ __host__ multiple_sum() : multiple_sum(T()) { }
+  // "This operation assumes the value of obtained by the T's default
+  // constructor (or by zero-initialization if no user-defined default
+  // constructor exists) is suitable as the identity value zero for addition."
+  __device__ __host__ multiple_sum() : multiple_sum(T()) {}
 
   __device__ __host__ multiple_sum(const T e) {
     for (int i = 0; i < items; i++)
