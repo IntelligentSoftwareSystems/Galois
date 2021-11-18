@@ -353,8 +353,8 @@ jobs:
             eigen \
             g++ \
             gcc \
-            llvm9-dev \
-            llvm9-static \
+            llvm10-dev \
+            llvm10-static \
             make \
             musl-dev \
             openssh-client \
