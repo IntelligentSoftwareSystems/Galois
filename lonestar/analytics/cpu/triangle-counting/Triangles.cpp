@@ -244,14 +244,14 @@ void orderedCountFunc(Graph& graph, GNode n,
   size_t numTriangles_local = 0;
   for (auto it_v : graph.edges(n)) {
     auto v = graph.getEdgeDst(it_v);
-    if (v > n)
+    if (v >= n)
       break;
     Graph::edge_iterator it_n =
         graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
 
     for (auto it_vv : graph.edges(v)) {
       auto vv = graph.getEdgeDst(it_vv);
-      if (vv > v)
+      if (vv >= v)
         break;
       while (graph.getEdgeDst(it_n) < vv)
         it_n++;
