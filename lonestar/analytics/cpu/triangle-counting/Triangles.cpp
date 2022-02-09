@@ -256,7 +256,15 @@ void orderedCountFunc(Graph& graph, GNode n,
       while (graph.getEdgeDst(it_n) < vv)
         it_n++;
       if (vv == graph.getEdgeDst(it_n)) {
-        numTriangles_local += 1;
+
+        Graph::edge_iterator multi_it_n = it_n;
+
+        while (multi_it_n !=
+                   graph.edge_end(n, galois::MethodFlag::UNPROTECTED) &&
+               graph.getEdgeDst(multi_it_n) == vv) {
+          numTriangles_local += 1;
+          multi_it_n++;
+        }
       }
     }
   }
