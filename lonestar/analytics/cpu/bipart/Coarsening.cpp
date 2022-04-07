@@ -49,7 +49,7 @@ void parallelRand(MetisGraph* graph, int) {
   T_RAND.start();
 
 	galois::do_all(
-      galois::iterate((uint64_t) 0, fineGGraph->hedges),
+      galois::iterate((size_t) 0, fineGGraph->hedges),
       [&fineGGraph](uint64_t item) {
 				unsigned netnum = fineGGraph->getData(item, flag_no_lock).netnum;
 				netnum= hash(netnum);
@@ -65,7 +65,7 @@ void parallelRand(MetisGraph* graph, int) {
 		galois::StatTimer T_INDEX("INDEX");
   	T_INDEX.start();
 		galois::do_all(
-      galois::iterate((uint64_t) 0, fineGGraph->hedges),
+      galois::iterate((size_t) 0, fineGGraph->hedges),
       [&fineGGraph](uint64_t item) {
         unsigned netnum = fineGGraph->getData(item, flag_no_lock).index;
         netnum= hash(1);
@@ -385,14 +385,14 @@ void coarsePhaseII(MetisGraph* graph, std::vector<bool>& hedges,
 void findLoneNodes(GGraph& graph){
 	
 	galois::do_all(
-		galois::iterate((uint64_t) graph.hedges, graph.size()),
+		galois::iterate(graph.hedges, graph.size()),
 			[&](GNode n){
 				
 				graph.getData(n).notAlone = false;
 			}, galois::steal(), galois::loopname("initialize not alone variables"));
 	
 	galois::do_all(
-		galois::iterate((uint64_t) 0, graph.hedges),
+		galois::iterate((size_t) 0, graph.hedges),
 			[&](GNode h){
 
 				for(auto n:graph.edges(h))

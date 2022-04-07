@@ -312,7 +312,7 @@ int main(int argc, char** argv) {
   kValue[(k + 1) / 2] = k / 2;
 
   galois::do_all(
-      galois::iterate((uint64_t)graph.hedges, graph.size()),
+      galois::iterate(graph.hedges, graph.size()),
       [&](GNode n) {
         unsigned pp = graph.getData(n).getPart();
         if (pp == 1) {
@@ -348,7 +348,7 @@ int main(int argc, char** argv) {
 
     // distribute hyperedges according to their current partition
     galois::do_all(
-        galois::iterate((uint64_t)0, graph.hedges),
+        galois::iterate((size_t)0, graph.hedges),
         [&](GNode h) {
           auto edge = *(graph.edges(h).begin());
           auto dst  = graph.getEdgeDst(edge);
