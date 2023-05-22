@@ -16,7 +16,7 @@ namespace galois {
 // TODO remove the need to hardcode this path
 //! Path to location of all gnn files
 static const std::string default_gnn_dataset_path =
-    "/net/ohm/export/iss/inputs/Learning/";
+    "/home/hochan/inputs/Learning/";
 
 //! Helper struct to maintain start/end/size of any particular range. Mostly
 //! used for mask ranges.

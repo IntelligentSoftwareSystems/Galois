@@ -40,6 +40,8 @@ private:
   std::vector<std::pair<uint32_t, uint32_t>> _mirrorRanges;
 
 public:
+  bool is_a_graph() { return true; }
+
   /**
    * Save weight gradients + number of them (i.e. size).
    * Then setup mirror metadata for Gluon to use during setup.
