@@ -351,6 +351,8 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     galois::PointerWithSize<galois::GNNFloat> prev_layer_input,
     galois::PointerWithSize<galois::GNNFloat>* input_gradient) {
   galois::StatTimer timer("BackwardPhase", kRegionName);
+  galois::StatTimer weight_gradient_sync_timer("BackwardPhaseWeightSync", kRegionName);
+  galois::StatTimer weight_gradient_sync_timer2("BackwardPhaseWeight2Sync", kRegionName);
   TimerStart(&timer);
 
   assert(layer_phase_ == GNNPhase::kTrain || layer_phase_ == GNNPhase::kBatch);
@@ -431,7 +433,10 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
     }
 #endif
   }
+
+  weight_gradient_sync_timer2.start();
   WeightGradientSyncSum2();
+  weight_gradient_sync_timer2.stop();
 
   // derivative of aggregation/update
   // TODO clean up logic here to reduce nesting
@@ -553,7 +558,10 @@ galois::PointerWithSize<galois::GNNFloat> galois::SAGELayer::BackwardPhase(
                                  p_backward_output_matrix_.data(), false);
     }
   }
+
+  weight_gradient_sync_timer.start();
   WeightGradientSyncSum();
+  weight_gradient_sync_timer.stop();
 
   // full gradient needed here; should occur after all updates
   if (layer_number_ != 0) {
@@ -587,16 +595,19 @@ void galois::SAGELayer::AggregateAll(
         pts,
     bool is_backward) {
   std::string agg_timer_name = "AggregateCompute";
+  std::string agg_sync_timer_name = "AggregateSync";
   size_t num_rows_to_handle;
   if (!is_backward) {
     agg_timer_name += "Forward";
+    agg_sync_timer_name += "Forward";
     num_rows_to_handle = layer_dimensions_.output_rows;
   } else {
     agg_timer_name += "Backward";
+    agg_sync_timer_name += "Backward";
     num_rows_to_handle = layer_dimensions_.input_rows;
   }
-
   galois::StatTimer timer(agg_timer_name.c_str(), kRegionName);
+  galois::StatTimer aggregate_all_sync_timer(agg_sync_timer_name.c_str(), kRegionName);
   TimerStart(&timer);
 
 #ifdef GALOIS_ENABLE_GPU
@@ -617,8 +628,10 @@ void galois::SAGELayer::AggregateAll(
     TimerStop(&timer);
 
     // aggregate sync
+    aggregate_all_sync_timer.start();
     graph_.AggregateSync(aggregate_output, column_length, is_backward,
                          num_rows_to_handle);
+    aggregate_all_sync_timer.stop();
 #ifdef GALOIS_ENABLE_GPU
   }
 #endif
@@ -728,7 +741,8 @@ void galois::SAGELayer::AggregateAllCPU(
           }
         }
       },
-      galois::chunk_size<1>(), galois::steal());
+      galois::chunk_size<1>(), galois::steal(),
+      galois::loopname("SAGEAggregateAll"));
 }
 
 void galois::SAGELayer::UpdateEmbeddings(const GNNFloat* node_embeddings,
@@ -854,10 +868,13 @@ void galois::SAGELayer::SelfFeatureUpdateEmbeddingsDerivative(
 
 void galois::SAGELayer::OptimizeLayer(BaseOptimizer* optimizer,
                                       size_t trainable_layer_number) {
+  galois::StatTimer total_gradient_timer("GradientDescent", kRegionName);
+  total_gradient_timer.start();
   optimizer->GradientDescent(p_layer_weight_gradients_, p_layer_weights_,
                              trainable_layer_number);
   if (!sage_config_.disable_concat) {
     second_weight_optimizer_->GradientDescent(p_layer_weight_gradients_2_,
                                               p_layer_weights_2_, 0);
   }
+  total_gradient_timer.stop();
 }

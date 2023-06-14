@@ -148,6 +148,8 @@ galois::GraphConvolutionalLayer::BackwardPhase(
     galois::PointerWithSize<galois::GNNFloat> prev_layer_input,
     galois::PointerWithSize<galois::GNNFloat>* input_gradient) {
   galois::StatTimer timer("BackwardPhase", kRegionName);
+  galois::StatTimer weight_gradient_timer("BackwardPhaseWeight", kRegionName);
+  galois::StatTimer weight_gradient_sync_timer("BackwardPhaseWeightSync", kRegionName);
   timer.start();
 
   assert(layer_phase_ == GNNPhase::kTrain);
@@ -190,12 +192,14 @@ galois::GraphConvolutionalLayer::BackwardPhase(
           input_gradient->data(), p_layer_weight_gradients_.data());
     } else {
 #endif
+      weight_gradient_timer.start();
       // temp 2 holds aggregated feature vectors from forward phase
       galois::CBlasSGEMM(
           CblasTrans, CblasNoTrans, layer_dimensions_.input_columns,
           layer_dimensions_.input_rows, layer_dimensions_.output_columns,
           agg_data.data(), input_gradient->data(),
           p_layer_weight_gradients_.data());
+      weight_gradient_timer.stop();
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
@@ -243,11 +247,13 @@ galois::GraphConvolutionalLayer::BackwardPhase(
           p_out_temp_.data(), p_layer_weight_gradients_.data());
     } else {
 #endif
+      weight_gradient_timer.start();
       galois::CBlasSGEMM(CblasTrans, CblasNoTrans,
                          layer_dimensions_.input_columns,
                          layer_dimensions_.input_rows,
                          layer_dimensions_.output_columns, input_data.data(),
                          p_out_temp_.data(), p_layer_weight_gradients_.data());
+      weight_gradient_timer.stop();
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
@@ -262,7 +268,9 @@ galois::GraphConvolutionalLayer::BackwardPhase(
 
   // sync weight gradients; note aggregation sync occurs in the function call
   // already
+  weight_gradient_sync_timer.start();
   WeightGradientSyncSum();
+  weight_gradient_sync_timer.stop();
 
   if (!config_.disable_dropout && layer_number_ != 0) {
     DoDropoutDerivative();
@@ -316,6 +324,7 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
     size_t column_length, const GNNFloat* node_embeddings,
     GNNFloat* aggregate_output,
     galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*) {
+  galois::StatTimer aggregate_all_sync_timer("AggregateSync", kRegionName);
   size_t num_nodes   = graph_.size();
   size_t last_master = *(graph_.end_owned());
   assert(0 == *(graph_.begin_owned()));
@@ -393,7 +402,9 @@ void galois::GraphConvolutionalLayer::AggregateAllCPU(
       galois::chunk_size<1>(), galois::steal(),
       galois::loopname("ConvolutionalAggregateAll"));
   // aggregate sync
+  aggregate_all_sync_timer.start();
   graph_.AggregateSync(aggregate_output, column_length);
+  aggregate_all_sync_timer.stop();
 }
 
 void galois::GraphConvolutionalLayer::UpdateEmbeddings(

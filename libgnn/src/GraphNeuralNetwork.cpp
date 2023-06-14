@@ -262,12 +262,22 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   std::vector<size_t> subgraph_layer_sizes;
   // this subgraph only needs to be created once
   if (config_.use_train_subgraph_ && !config_.train_minibatch_size()) {
+    galois::StatTimer total_subgraph_construction_timer("TotalSubGraphConstruction", kRegionName);
+    galois::StatTimer setup_neighborhood_sample_timer("SetupNeighborhoodSample", kRegionName);
+    galois::StatTimer edge_sampling_timer("SampleAllEdges", kRegionName);
+    galois::StatTimer subgraph_construction_timer("SubGraphConstruction", kRegionName);
+    total_subgraph_construction_timer.start();
+
+    setup_neighborhood_sample_timer.start();
     // Setup the subgraph to only be the training graph
     size_t local_seed_node_count = graph_->SetupNeighborhoodSample();
+    setup_neighborhood_sample_timer.stop();
+
     subgraph_layer_sizes.emplace_back(local_seed_node_count);
     galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
                    local_seed_node_count);
     size_t num_sampled_layers = 0;
+    edge_sampling_timer.start();
     // gnn_layers_.back()->ResizeRows(local_seed_node_count);
     for (auto back_iter = gnn_layers_.rbegin(); back_iter != gnn_layers_.rend();
          back_iter++) {
@@ -290,8 +300,12 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         num_sampled_layers++;
       }
     }
+    edge_sampling_timer.stop();
+    subgraph_construction_timer.start();
     CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));
+    subgraph_construction_timer.stop();
     CorrectBackwardLinks();
+    total_subgraph_construction_timer.stop();
   }
 
   galois::StatTimer epoch_timer("TrainingTime", kRegionName);
@@ -327,14 +341,20 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
     // beginning of epoch sampling (no minibatches)
     if (config_.do_sampling() && !config_.train_minibatch_size()) {
       galois::StatTimer mb_timer("EpochSubgraphCreation", kRegionName);
+      galois::StatTimer subgraph_construction_timer("SubGraphConstruction", kRegionName);
+      galois::StatTimer setup_neighborhood_sample_timer("SetupNeighborhoodSample", kRegionName);
+      galois::StatTimer edge_sampling_timer("SampleEdges", kRegionName);
       mb_timer.start();
 
+      setup_neighborhood_sample_timer.start();
       size_t local_seed_node_count = graph_->SetupNeighborhoodSample();
+      setup_neighborhood_sample_timer.stop();
       // gnn_layers_.back()->ResizeRows(local_seed_node_count);
       galois::gDebug(graph_->host_prefix(), "Number of local seed nodes is ",
                      local_seed_node_count);
       size_t num_sampled_layers = 0;
 
+      edge_sampling_timer.start();
       // work backwards on GCN/SAGE layers
       // loop backward and find last GCN/SAGE (main) layer to disable activation
       for (auto back_iter = gnn_layers_.rbegin();
@@ -358,8 +378,11 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
           num_sampled_layers++;
         }
       }
+      edge_sampling_timer.stop();
       // resize layer matrices
+      subgraph_construction_timer.start();
       CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));
+      subgraph_construction_timer.stop();
       CorrectBackwardLinks();
       mb_timer.stop();
     }
@@ -386,6 +409,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         galois::StatTimer prep_timer("PrepNextMinibatch", kRegionName);
         galois::StatTimer sample_time("MinibatchSampling", kRegionName);
         galois::StatTimer mb_timer("MinibatchSubgraphCreation", kRegionName);
+        galois::StatTimer subgraph_construction_timer("SubGraphConstruction", kRegionName);
         mb_timer.start();
 
         galois::Timer batch_timer;
@@ -454,7 +478,9 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
         sample_time.stop();
 
         // resize layer matrices
+        subgraph_construction_timer.start();
         CorrectRowCounts(graph_->ConstructSampledSubgraph(num_sampled_layers));
+        subgraph_construction_timer.stop();
         CorrectBackwardLinks();
 
         // XXX resizes above only work for SAGE layers; will break if other
@@ -659,7 +685,7 @@ float galois::GraphNeuralNetwork::Train(size_t num_epochs) {
   uint64_t average_epoch_time = epoch_timer.get() / num_epochs;
   galois::runtime::reportStat_Tavg(kRegionName, "AverageEpochTime",
                                    average_epoch_time);
-  DisableTimers();
+  //DisableTimers();
   // disable subgraph
   graph_->DisableSubgraph();
   graph_->EnableSubgraphChooseAll();

@@ -232,7 +232,7 @@ public:
 private:
   static const constexpr char* kRegionName = "GraphNeuralNetwork";
 
-  bool timers_on_{false};
+  bool timers_on_{true};
 
   void EnableTimers() {
     timers_on_ = true;

@@ -716,11 +716,22 @@ float galois::graphs::GNNGraph::GetGlobalAccuracy(
 
 float galois::graphs::GNNGraph::GetGlobalAccuracyCPU(
     PointerWithSize<GNNFloat> predictions, GNNPhase phase, bool sampling) {
+  galois::StatTimer global_accuracy_timer("GetGlobalAccuracy");
+  galois::StatTimer global_accuracy_for_singleclass_timer("GetGlobalAccuracyForSingleClass");
+  galois::StatTimer global_accuracy_for_multiclass_timer("GetGlobalAccuracyForMultiClass");
+  global_accuracy_timer.start();
+  float accuracy{0};
   if (is_single_class_label()) {
-    return GetGlobalAccuracyCPUSingle(predictions, phase, sampling);
+    global_accuracy_for_singleclass_timer.start();
+    accuracy = GetGlobalAccuracyCPUSingle(predictions, phase, sampling);
+    global_accuracy_for_singleclass_timer.stop();
   } else {
-    return GetGlobalAccuracyCPUMulti(predictions, phase, sampling);
+    global_accuracy_for_multiclass_timer.start();
+    accuracy = GetGlobalAccuracyCPUMulti(predictions, phase, sampling);
+    global_accuracy_for_multiclass_timer.stop();
   }
+  global_accuracy_timer.stop();
+  return accuracy;
 }
 
 float galois::graphs::GNNGraph::GetGlobalAccuracyCPUSingle(
