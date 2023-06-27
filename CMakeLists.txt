@@ -39,6 +39,7 @@ set(GALOIS_USE_SANITIZER "" CACHE STRING "Semi-colon list of sanitizers to use (
 # Putting this here is mostly just a placeholder so people know it's an option.
 # Currently this is really only intended to change anything for the libgalois_shmem target.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
+set(BUILD_DOCS "" CACHE STRING "Build documentation with make doc. Supported values: <unset>, external, internal. external docs hide '*-draft*' and '*-internal* documentation pages and directories when building documentation")
 ###### Developer features ######
 set(GALOIS_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
 set(GALOIS_NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
@@ -230,15 +231,9 @@ endif(USE_EXP)
 
 ###### Documentation ######
 
-find_package(Doxygen)
-if(DOXYGEN_FOUND)
-  #TODO: double check the list of directories here
-  set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libcusp\" \"${CMAKE_CURRENT_SOURCE_DIR}/libdist\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgalois/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgalois/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgluon")
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
-     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
-  add_custom_target(doc ${DOXYGEN_EXECUTABLE}
-     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in WORKING_DIRECTORY
-     ${CMAKE_CURRENT_BINARY_DIR})
+if(BUILD_DOCS)
+  set(GALOIS_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
+  add_subdirectory(docs)
 endif()
 
 ###### Installation ######
