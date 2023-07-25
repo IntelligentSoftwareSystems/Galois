@@ -347,6 +347,203 @@ private:
     increment_evilPhase();
   }
 
+  /**
+   * Given the number of global nodes, compute the masters for each node by
+   * evenly (or unevenly as specified by scale factor)
+   * blocking the nodes off to assign to each host. Considers
+   * ONLY nodes and not edges.
+   *
+   * @param numGlobalNodes The number of global nodes to divide
+   * @param scalefactor A vector that specifies if a particular host
+   * should have more or less than other hosts
+   * @param DecomposeFactor Specifies how decomposed the blocking
+   * of nodes should be. For example, a factor of 2 will make 2 blocks
+   * out of 1 block had the decompose factor been set to 1.
+   */
+  void computeMastersBlockedNodes(uint64_t numGlobalNodes,
+                                  const std::vector<unsigned>& scalefactor,
+                                  unsigned DecomposeFactor = 1) {
+    uint64_t numNodes_to_divide = numGlobalNodes;
+    if (scalefactor.empty() || (numHosts * DecomposeFactor == 1)) {
+      for (unsigned i = 0; i < numHosts * DecomposeFactor; ++i)
+        gid2host.push_back(galois::block_range(uint64_t{0}, numNodes_to_divide,
+                                               i, numHosts * DecomposeFactor));
+      return;
+    }
+
+    // TODO: not compatible with DecomposeFactor.
+    assert(scalefactor.size() == numHosts);
+
+    unsigned numBlocks = 0;
+
+    for (unsigned i = 0; i < numHosts; ++i) {
+      numBlocks += scalefactor[i];
+    }
+
+    std::vector<std::pair<uint64_t, uint64_t>> blocks;
+    for (unsigned i = 0; i < numBlocks; ++i) {
+      blocks.push_back(
+          galois::block_range(uint64_t{0}, numNodes_to_divide, i, numBlocks));
+    }
+
+    std::vector<unsigned> prefixSums;
+    prefixSums.push_back(0);
+
+    for (unsigned i = 1; i < numHosts; ++i) {
+      prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
+    }
+
+    for (unsigned i = 0; i < numHosts; ++i) {
+      unsigned firstBlock = prefixSums[i];
+      unsigned lastBlock  = prefixSums[i] + scalefactor[i] - 1;
+      gid2host.push_back(
+          std::make_pair(blocks[firstBlock].first, blocks[lastBlock].second));
+    }
+  }
+
+  /**
+   * Given the number of global nodes and edges,
+   * compute the masters for each node by
+   * evenly (or unevenly as specified by scale factor)
+   * blocking the nodes off to assign to each host while taking
+   * into consideration the only edges of the node to get
+   * even blocks.
+   *
+   * @param numGlobalNodes The number of global nodes to divide
+   * @param numGlobalEdges The number of global edges to divide
+   * @param outIndices A complete outgoing edge range array of CSR to calculate
+   * range
+   * @param scalefactor A vector that specifies if a particular host
+   * should have more or less than other hosts
+   * @param DecomposeFactor Specifies how decomposed the blocking
+   * of nodes should be. For example, a factor of 2 will make 2 blocks
+   * out of 1 block had the decompose factor been set to 1.
+   */
+  void computeMastersBalancedEdges(uint64_t numGlobalNodes,
+                                   uint64_t numGlobalEdges,
+                                   uint64_t* outIndices,
+                                   const std::vector<unsigned>& scalefactor,
+                                   uint32_t edgeWeight,
+                                   unsigned DecomposeFactor = 1) {
+    if (edgeWeight == 0) {
+      edgeWeight = 1;
+    }
+
+    auto& net = galois::runtime::getSystemNetworkInterface();
+
+    gid2host.resize(numHosts * DecomposeFactor);
+    for (unsigned d = 0; d < DecomposeFactor; ++d) {
+      // TODO(hc):
+      auto r = galois::graphs::divideNodesBinarySearch(
+          numGlobalNodes, numGlobalEdges, 0, edgeWeight, (id + d * numHosts),
+              numHosts * DecomposeFactor, outIndices, scalefactor);
+      gid2host[id + d * numHosts].first  = *(r.first.first);
+      gid2host[id + d * numHosts].second = *(r.first.second);
+    }
+
+    for (unsigned h = 0; h < numHosts; ++h) {
+      if (h == id) {
+        continue;
+      }
+      galois::runtime::SendBuffer b;
+      for (unsigned d = 0; d < DecomposeFactor; ++d) {
+        galois::runtime::gSerialize(b, gid2host[id + d * numHosts]);
+      }
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
+    }
+    net.flush();
+    unsigned received = 1;
+    while (received < numHosts) {
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
+      do {
+        p = net.recieveTagged(galois::runtime::evilPhase);
+      } while (!p);
+      assert(p->first != id);
+      auto& b = p->second;
+      for (unsigned d = 0; d < DecomposeFactor; ++d) {
+        galois::runtime::gDeserialize(b, gid2host[p->first + d * numHosts]);
+      }
+      ++received;
+    }
+    increment_evilPhase();
+
+#ifndef NDEBUG
+    // TODO(hc):
+    for (unsigned h = 0; h < numHosts; h++) {
+      if (h == 0) {
+        assert(gid2host[h].first == 0);
+      } else if (h == numHosts - 1) {
+        assert(gid2host[h].first == gid2host[h - 1].second);
+        assert(gid2host[h].second == numGlobalNodes);
+      } else {
+        assert(gid2host[h].first == gid2host[h - 1].second);
+        assert(gid2host[h].second == gid2host[h + 1].first);
+      }
+    }
+#endif
+  }
+
+  /**
+   * Given the number of global nodes and edges,
+   * compute the masters for each node by evenly
+   * (or unevenly as specified by scale factor)
+   * blocking the nodes off to assign to each host while taking
+   * into consideration the edges of the node AND the node itself.
+   *
+   * @param numGlobalNodes The number of global nodes to divide
+   * @param numGlobalEdges The number of global edges to divide
+   * @param outIndices A complete outgoing edge range array of CSR to calculate
+   * range
+   * @param scalefactor A vector that specifies if a particular host
+   * should have more or less than other hosts
+   * @param DecomposeFactor Specifies how decomposed the blocking
+   * of nodes should be. For example, a factor of 2 will make 2 blocks
+   * out of 1 block had the decompose factor been set to 1. Ignored
+   * in this function currently.
+   *
+   * @todo make this function work with decompose factor
+   */
+  void computeMastersBalancedNodesAndEdges(
+      uint64_t numGlobalNodes, uint64_t numGlobalEdges,
+      uint64_t* outIndices, const std::vector<unsigned>& scalefactor,
+      uint32_t nodeWeight, uint32_t edgeWeight, unsigned) {
+    if (nodeWeight == 0) {
+      nodeWeight = numGlobalEdges / numGlobalNodes; // average degree
+    }
+    if (edgeWeight == 0) {
+      edgeWeight = 1;
+    }
+
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    gid2host.resize(numHosts);
+    auto r = galois::graphs::divideNodesBinarySearch(
+        numGlobalNodes, numGlobalEdges, nodeWeight, edgeWeight,
+            id, numHosts, outIndices, scalefactor);
+    gid2host[id].first  = *r.first.first;
+    gid2host[id].second = *r.first.second;
+    for (unsigned h = 0; h < numHosts; ++h) {
+      if (h == id)
+        continue;
+      galois::runtime::SendBuffer b;
+      galois::runtime::gSerialize(b, gid2host[id]);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
+    }
+    net.flush();
+    unsigned received = 1;
+    while (received < numHosts) {
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
+      do {
+        p = net.recieveTagged(galois::runtime::evilPhase);
+      } while (!p);
+      assert(p->first != id);
+      auto& b = p->second;
+      galois::runtime::gDeserialize(b, gid2host[p->first]);
+      ++received;
+    }
+    increment_evilPhase();
+  }
+
+
 protected:
   /**
    * Wrapper call that will call into more specific compute masters
@@ -400,6 +597,67 @@ protected:
         " seeks (", g.num_bytes_read() / (float)timer.get_usec(), " MBPS)");
     return numNodes_to_divide;
   }
+
+  /**
+   * Wrapper call that will call into more specific compute masters
+   * functions that compute masters based on nodes, edges, or both.
+   *
+   * @param masters_distribution method of masters distribution to use
+   * @param numGlobalNodes The number of global nodes to divide
+   * @param numGlobalEdges The number of global edges to divide
+   * @param outIndices A complete outgoing edge range array of CSR to calculate
+   * range
+   * @param scalefactor A vector that specifies if a particular host
+   * should have more or less than other hosts
+   * @param nodeWeight weight to give nodes when computing balance
+   * @param edgeWeight weight to give edges when computing balance
+   * @param DecomposeFactor Specifies how decomposed the blocking
+   * of nodes should be. For example, a factor of 2 will make 2 blocks
+   * out of 1 block had the decompose factor been set to 1.
+   */
+  uint64_t computeMasters(MASTERS_DISTRIBUTION masters_distribution,
+                          uint64_t numGlobalNodes, uint64_t numGlobalEdges,
+                          uint64_t* outIndices,
+                          const std::vector<unsigned>& scalefactor,
+                          uint32_t nodeWeight = 0, uint32_t edgeWeight = 0,
+                          unsigned DecomposeFactor = 1) {
+    galois::Timer timer;
+    timer.start();
+    uint64_t numNodes_to_divide = numGlobalNodes;
+
+    // compute masters for all nodes
+    switch (masters_distribution) {
+    case BALANCED_MASTERS:
+      computeMastersBlockedNodes(
+          numGlobalNodes, scalefactor, DecomposeFactor);
+      break;
+    case BALANCED_MASTERS_AND_EDGES:
+      computeMastersBalancedNodesAndEdges(
+          numGlobalNodes, numGlobalEdges, outIndices,
+          scalefactor, nodeWeight, edgeWeight, DecomposeFactor);
+      break;
+    case BALANCED_EDGES_OF_MASTERS:
+    default:
+      computeMastersBalancedEdges(
+          numGlobalNodes, numGlobalEdges, outIndices,
+          scalefactor, edgeWeight, DecomposeFactor);
+      break;
+    }
+
+    timer.stop();
+
+    galois::runtime::reportStatCond_Tmax<MORE_DIST_STATS>(
+        GRNAME, "MasterDistTime", timer.get());
+
+#if 0
+    galois::gDebug(
+        "[", id, "] Master distribution time : ", timer.get_usec() / 1000000.0f,
+        " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
+        " seeks (", g.num_bytes_read() / (float)timer.get_usec(), " MBPS)");
+#endif
+    return numNodes_to_divide;
+  }
+
 
   //! reader assignment from a file
   //! corresponds to master assignment if using an edge cut

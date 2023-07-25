@@ -107,6 +107,8 @@ namespace cll = llvm::cl;
 extern cll::opt<std::string> dataset;
 //! partitioning scheme to use
 extern cll::opt<galois::graphs::PARTITIONING_SCHEME> partitionScheme;
+//! true if input graph file format is SHAD WMD
+extern cll::opt<bool> useShad;
 
 // @todo command line argument for read balancing across hosts
 
@@ -130,27 +132,26 @@ template <typename NodeData, typename EdgeData>
 std::unique_ptr<DistGraph<NodeData, EdgeData>> constructSymmetricGraph(std::vector<unsigned>&) {
   std::string inputFile = deepgalois::path + dataset + ".csgr";
   galois::gInfo("File to read is ", inputFile);
-
   switch (partitionScheme) {
   case OEC:
   case IEC:
     return cuspPartitionGraph<NoCommunication, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, useShad, true, "");
   case HOVC:
   case HIVC:
     return cuspPartitionGraph<GenericHVC, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, useShad, true, "");
 
   case CART_VCUT:
   case CART_VCUT_IEC:
     return cuspPartitionGraph<GenericCVC, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, useShad, true, "");
   case GNN_OEC:
     return cuspPartitionGraph<GnnOEC, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, useShad, true, "");
   case GNN_CVC:
     return cuspPartitionGraph<GnnCVC, NodeData, EdgeData>(
-        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, true, "");
+        inputFile, galois::CUSP_CSR, galois::CUSP_CSR, useShad, true, "");
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
     return nullptr;

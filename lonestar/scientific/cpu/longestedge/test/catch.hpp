@@ -10723,6 +10723,13 @@ PVOID FatalConditionHandler::exceptionHandlerHandle = nullptr;
 
 #elif defined( CATCH_CONFIG_POSIX_SIGNALS )
 
+// MINSIGSTKSZ is not constexpr in the recent Linux, and so,
+// requires manual declaration for backward compatibility.
+// This number is from
+// https://stackoverflow.com/questions/71454588/minsigstksz-error-after-update-in-my-manjaro-linux`
+#undef MINSIGSTKSZ
+#define MINSIGSTKSZ 16384
+
 namespace Catch {
 
     struct SignalDefs {

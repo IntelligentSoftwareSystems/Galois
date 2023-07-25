@@ -11,7 +11,8 @@ namespace {
 std::unique_ptr<galois::graphs::GNNGraph::GNNDistGraph>
 LoadPartition(const std::string& input_directory,
               const std::string& dataset_name,
-              galois::graphs::GNNPartitionScheme partition_scheme) {
+              galois::graphs::GNNPartitionScheme partition_scheme,
+              bool useShad) {
   // XXX input path
   std::string input_file = input_directory + dataset_name + ".csgr";
   GALOIS_LOG_VERBOSE("Partition loading: File to read is {}", input_file);
@@ -20,13 +21,13 @@ LoadPartition(const std::string& input_directory,
   switch (partition_scheme) {
   case galois::graphs::GNNPartitionScheme::kOEC:
     return galois::cuspPartitionGraph<GnnOEC, char, void>(
-        input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
+        input_file, galois::CUSP_CSR, galois::CUSP_CSR, useShad, true, "", "", false, 1);
   case galois::graphs::GNNPartitionScheme::kCVC:
     return galois::cuspPartitionGraph<GnnCVC, char, void>(
-        input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
+        input_file, galois::CUSP_CSR, galois::CUSP_CSR, useShad, true, "", "", false, 1);
   case galois::graphs::GNNPartitionScheme::kOCVC:
     return galois::cuspPartitionGraph<GenericCVC, char, void>(
-        input_file, galois::CUSP_CSR, galois::CUSP_CSR, true, "", "", false, 1);
+        input_file, galois::CUSP_CSR, galois::CUSP_CSR, useShad, true, "", "", false, 1);
   default:
     GALOIS_LOG_FATAL("Error: partition scheme specified is invalid");
     return nullptr;
@@ -65,14 +66,16 @@ unsigned layer_number_to_sync;
 
 galois::graphs::GNNGraph::GNNGraph(const std::string& dataset_name,
                                    GNNPartitionScheme partition_scheme,
-                                   bool has_single_class_label)
+                                   bool has_single_class_label,
+                                   bool useShad)
     : GNNGraph(galois::default_gnn_dataset_path, dataset_name, partition_scheme,
-               has_single_class_label) {}
+               has_single_class_label, useShad) {}
 
 galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
                                    const std::string& dataset_name,
                                    GNNPartitionScheme partition_scheme,
-                                   bool has_single_class_label)
+                                   bool has_single_class_label,
+                                   bool useShad)
     : input_directory_(input_directory) {
   GALOIS_LOG_VERBOSE("[{}] Constructing partitioning for {}", host_id_,
                      dataset_name);
@@ -84,7 +87,7 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
       std::string("] ");
   // load partition
   partitioned_graph_ =
-      LoadPartition(input_directory_, dataset_name, partition_scheme);
+      LoadPartition(input_directory_, dataset_name, partition_scheme, useShad);
   // reverse edges
   partitioned_graph_->ConstructIncomingEdges();
 

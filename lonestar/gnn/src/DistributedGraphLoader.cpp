@@ -41,3 +41,8 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
         clEnumValN(GNN_CVC, "g-cvc",
                    "gnn cvc: train nodes evenly distributed")),
     cll::init(GNN_OEC));
+
+cll::opt<bool> useShad("useShad", cll::desc("true if the input graph is"
+                                            " SHAD WMD graph format."
+                                            " Otheriwse, set false."),
+                       cll::init(false));

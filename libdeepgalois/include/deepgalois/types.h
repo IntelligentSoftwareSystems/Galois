@@ -3,6 +3,7 @@
 #include <set>
 #include <vector>
 #include <stdint.h>
+#include <cstddef>
 
 // TODO namespace
 

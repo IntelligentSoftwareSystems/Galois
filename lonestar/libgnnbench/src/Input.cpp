@@ -26,6 +26,11 @@ llvm::cl::opt<galois::graphs::GNNPartitionScheme> partition_scheme(
                            "Original Cartesian Vertex-Cut")),
     cll::init(galois::graphs::GNNPartitionScheme::kOEC));
 
+cll::opt<bool> useShad("useShad", cll::desc("true if the input graph is"
+                                            " SHAD WMD graph format."
+                                            " Otheriwse, set false."),
+                       cll::init(false));
+
 llvm::cl::opt<unsigned> num_layers(
     "numLayers",
     cll::desc(
@@ -341,7 +346,8 @@ std::vector<unsigned> CreateFanOutVector() {
 std::unique_ptr<galois::GraphNeuralNetwork> InitializeGraphNeuralNetwork() {
   // partition/load graph
   auto gnn_graph = std::make_unique<galois::graphs::GNNGraph>(
-      input_directory, input_name, partition_scheme, !multiclass_labels);
+      input_directory, input_name, partition_scheme, !multiclass_labels,
+      useShad);
 
   // create layer types vector
   std::vector<galois::GNNLayerType> layer_types = CreateLayerTypesVector();

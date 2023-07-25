@@ -278,6 +278,46 @@ public:
   BufferedGraph() { resetReadCounters(); }
 
   /**
+   * @brief Construct a buffered graph from parameters paseed.
+   * The array parameters should be constructed outside.
+   *
+   * @param _outIndexBuffer Outgoing neighbors range for each node
+   * @param _edgeDestBuffer Outgoing edge destination nodes
+   * @param _edgeDataBuffer Outgoing edge data
+   * @param _globalsize The number of global nodes
+   * @param _globalEdgeSize The number of global edges
+   * @param _numLocalNodes The number of local nodes
+   * @param _numLocalEdges The number of local edges
+   * @param _nodeOffset Node offsets on the global node space of
+   * the current host
+   * @param _edgeOffset Edge offsets on the global edge space of
+   * the current host
+   */
+  void constructFrom(uint64_t* _outIndexBuffer, uint32_t* _edgeDestBuffer,
+      EdgeDataType* _edgeDataBuffer, uint32_t _globalSize,
+      uint64_t _globalEdgeSize, uint32_t _numLocalNodes,
+      uint64_t _numLocalEdges, uint64_t _nodeOffset,
+      uint64_t _edgeOffset) {
+    assert(_outIndexBuffer != nullptr);
+    assert(_edgeDestBuffer != nullptr);
+    assert(_edgeDataBuffer != nullptr);
+    outIndexBuffer = _outIndexBuffer;
+    edgeDestBuffer = _edgeDestBuffer;
+    edgeDataBuffer = _edgeDataBuffer;
+    globalSize = _globalSize;
+    globalEdgeSize = _globalEdgeSize;
+    numLocalNodes = _numLocalNodes;
+    numLocalEdges = _numLocalEdges;
+    nodeOffset = _nodeOffset;
+    edgeOffset = _edgeOffset;
+    resetReadCounters();
+    graphLoaded = true;
+    numBytesReadOutIndex += sizeof(uint64_t);
+    numBytesReadEdgeDest += sizeof(uint64_t);
+    numBytesReadEdgeData += sizeof(uint64_t);
+  }
+
+  /**
    * On destruction, free allocated buffers (if necessary).
    */
   ~BufferedGraph() noexcept { freeMemory(); }
@@ -430,10 +470,9 @@ public:
     }
     assert(nodeOffset <= globalNodeID);
     assert(globalNodeID < (nodeOffset + numLocalNodes));
-
     numBytesReadOutIndex += sizeof(uint64_t);
-
     uint64_t localNodeID = globalNodeID - nodeOffset;
+
     return EdgeIterator(outIndexBuffer[localNodeID]);
   }
 

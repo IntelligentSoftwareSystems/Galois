@@ -44,10 +44,11 @@ public:
   //  galois::LargeArray<std::vector<bool>>>;
 
   GNNGraph(const std::string& dataset_name, GNNPartitionScheme partition_scheme,
-           bool has_single_class_label);
+           bool has_single_class_label, bool useShad = false);
   //! Loads a graph and all relevant metadata (labels, features, masks, etc.)
   GNNGraph(const std::string& input_directory, const std::string& dataset_name,
-           GNNPartitionScheme partition_scheme, bool has_single_class_label);
+           GNNPartitionScheme partition_scheme, bool has_single_class_label,
+           bool useShad = false);
 
   //! Returns host id
   size_t host_id() const { return host_id_; }

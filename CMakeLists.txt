@@ -38,7 +38,7 @@ set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture
 set(USE_DEEPGALOIS OFF CACHE BOOL "Use gnn apps as well as the DeepGalois library")
 set(USE_MKL_BLAS OFF CACHE BOOL "Use MKL for BLAS")
 # TODO; this is GNN related; find better way to do than hardcode
-SET(CUDA_HOME /org/centers/cdgc/cuda/cuda-10.2)
+#SET(CUDA_HOME /org/centers/cdgc/cuda/cuda-10.2)
 
 # This option is automatically handled by CMake.
 # It makes add_library build a shared lib unless STATIC is explicitly specified.
@@ -141,8 +141,7 @@ endif()
 # TODO (loc) prefix with GALOIS, move elsewhere more fitting in this file
 ################################################################################
 if(USE_MKL_BLAS)
-  SET(INTEL_ROOT /opt/apps/sysnet/intel/20.0)
-  SET(MKL_ROOT ${INTEL_ROOT}/mkl)
+  SET(MKL_ROOT /home/hochan/intel/oneapi/mkl/2023.1.0)
   find_package(MKL REQUIRED)
   message(STATUS "MKL: ${MKL_INCLUDE_DIRS}")
   if (MKL_FOUND)
@@ -151,7 +150,7 @@ if(USE_MKL_BLAS)
   endif()
 endif()
 
-SET(OPENBLAS_ROOT /org/centers/cdgc/openblas/gcc8.1)
+#SET(OPENBLAS_ROOT /org/centers/cdgc/openblas/gcc8.1)
 if(USE_OPENBLAS)
   find_package(OpenBLAS)
   message(STATUS "OpenBLAS: ${OPENBLAS_INCLUDE_DIRS}")

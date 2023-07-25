@@ -27,3 +27,5 @@ install(TARGETS galois_cusp
     COMPONENT lib
   INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
+
+add_subdirectory(test)
