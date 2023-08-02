@@ -90,6 +90,8 @@ galois::graphs::GNNGraph::GNNGraph(const std::string& input_directory,
       LoadPartition(input_directory_, dataset_name, partition_scheme, useShad);
   // reverse edges
   partitioned_graph_->ConstructIncomingEdges();
+  // mark a node if it is sampled
+  mark_sampled_nodes_.resize(partitioned_graph_->size());
 
   galois::gInfo(host_prefix_, "Number of local proxies is ",
                 partitioned_graph_->size());

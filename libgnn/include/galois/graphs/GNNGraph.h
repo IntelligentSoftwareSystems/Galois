@@ -582,29 +582,29 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   //! Makes a node "sampled"; used for debugging/testing
-  void SetSampledNode(size_t node) { partitioned_graph_->getData(node) = 1; }
+  void SetSampledNode(size_t node) { mark_sampled_nodes_[node] = 1; }
   //! Makes a node "not sampled"; used for debugging/testing
-  void UnsetSampledNode(size_t node) { partitioned_graph_->getData(node) = 0; }
+  void UnsetSampledNode(size_t node) { mark_sampled_nodes_[node] = 0; }
 
   //! Returns true if a particular node is currently considered "in" a sampled
   //! graph
   bool IsInSampledGraph(const NodeIterator& ni) const {
     // TODO(loc) GPU
     assert(*ni < size());
-    return partitioned_graph_->getData(*ni);
+    return mark_sampled_nodes_[*ni];
   }
   bool IsInSampledGraph(size_t node_id) const {
     // TODO(loc) GPU
     assert(node_id < size());
-    return partitioned_graph_->getData(node_id);
+    return mark_sampled_nodes_[node_id];
   }
   bool IsInSampledGraphSubgraph(size_t node_id) const {
     // TODO(loc) GPU
     assert(node_id < size());
     if (use_subgraph_) {
-      return partitioned_graph_->getData(ConvertToLID(node_id));
+      return mark_sampled_nodes_[ConvertToLID(node_id)];
     } else {
-      return partitioned_graph_->getData(node_id);
+      return mark_sampled_nodes_[node_id];
     }
   }
 
@@ -849,6 +849,8 @@ private:
   DGAccumulator<size_t> local_true_negative_;
   DGAccumulator<size_t> local_false_positive_;
   DGAccumulator<size_t> local_false_negative_;
+
+  std::vector<char> mark_sampled_nodes_;
 
   bool use_timer_{true};
 };
