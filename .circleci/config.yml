@@ -1,4 +1,17 @@
-version: 2
+version: 2.1
+
+common_step: &cmake_build_test
+  - run: |
+      cmake --build /tmp/build --target input
+      if [ -n "$CIRCLE_PULL_REQUEST" ]; then \
+        subset=$(source .circleci/longest_common_path.sh); \
+        echo "Changes of ${CIRCLE_SHA1} are all under $subset"; \
+      fi
+      cmake --build /tmp/build/${subset:-.} --parallel 2
+      # Run tests as non-root otherwise MPI will complain
+      (cd /tmp/build/${subset:-.} \
+        && chown -R runner . \
+        && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
 
 # TODO: These builds are currently configured to
 # install the needed dependencies in each container
@@ -17,7 +30,7 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git curl gnupg software-properties-common wget
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key 2>/dev/null | apt-key add -
           apt-add-repository -y 'deb https://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
           apt-get -q update -y
@@ -37,7 +50,7 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git curl gnupg software-properties-common wget
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key 2>/dev/null | apt-key add -
           apt-add-repository -y 'ppa:ubuntu-toolchain-r/test'
@@ -72,12 +85,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DGALOIS_USE_SANITIZER="Address;Undefined"
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          # Run tests as non-root otherwise MPI will complain
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+      - <<: *cmake_build_test
   "Debian":
     docker:
       - image: debian:10
@@ -86,6 +94,7 @@ jobs:
       - run: |
           apt-get -q update -y
           apt-get -q install -y git
+          apt-get -q install -y curl
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -107,20 +116,15 @@ jobs:
           mkdir -p /tmp/build
 
           cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          # Run tests as non-root otherwise MPI will complain
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
-  "Ubuntu-18.04":
+      - <<: *cmake_build_test
+  "Ubuntu-18_04":
     docker:
       - image: ubuntu:18.04
     steps:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git curl gnupg software-properties-common wget
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
           apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
           apt-get -q update -y
@@ -144,12 +148,8 @@ jobs:
           mkdir -p /tmp/build
 
           cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
-  "Ubuntu-18.04-cuda10.1-build-only":
+      - <<: *cmake_build_test
+  "Ubuntu-18_04-cuda10_1-build-only":
     docker:
       - image: nvidia/cuda:10.1-devel-ubuntu18.04
     steps:
@@ -178,7 +178,7 @@ jobs:
           cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON -DGALOIS_ENABLE_GPU=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
-  "Ubuntu-18.04-cuda10.2-build-only":
+  "Ubuntu-18_04-cuda10_2-build-only":
     docker:
       - image: nvidia/cuda:10.2-devel-ubuntu18.04
     steps:
@@ -220,7 +220,7 @@ jobs:
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
 
-          yum -y -q install git
+          yum -y -q install git curl
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -252,11 +252,7 @@ jobs:
           mkdir -p build
 
           cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+      - <<: *cmake_build_test
   "CentOS-8-clang":
     docker:
       - image: centos:8
@@ -270,7 +266,7 @@ jobs:
           yum -y -q install dnf-plugins-core
           yum -y -q config-manager --set-enabled PowerTools
 
-          yum -y -q install git
+          yum -y -q install git curl
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -299,11 +295,7 @@ jobs:
             -B /tmp/build \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+      - <<: *cmake_build_test
   "Arch":
     docker:
       - image: archlinux:base
@@ -311,7 +303,7 @@ jobs:
       - checkout
       - run: |
           pacman -Sy
-          pacman -q -S --noconfirm git
+          pacman -q -S --noconfirm git curl
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -332,18 +324,14 @@ jobs:
           mkdir -p /tmp/build
 
           cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+      - <<: *cmake_build_test
   "Alpine":
     docker:
       - image: alpine:latest
     steps:
       - checkout
       - run: |
-          apk add --no-cache --no-progress git
+          apk add --no-cache --no-progress git curl
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -366,18 +354,14 @@ jobs:
           mkdir -p /tmp/build
 
           cmake -S . -B /tmp/build
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+      - <<: *cmake_build_test
   "Fedora-gcc":
     docker:
       - image: fedora:latest
     steps:
       - checkout
       - run: |
-          yum -y -q install git
+          yum -y -q install git curl
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -401,18 +385,14 @@ jobs:
           . /etc/bashrc
           module load mpi
           cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+      - <<: *cmake_build_test
   "Fedora-clang":
     docker:
       - image: fedora:latest
     steps:
       - checkout
       - run: |
-          yum -y -q install git
+          yum -y -q install git curl
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -441,25 +421,50 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+      - <<: *cmake_build_test
  
 workflows:
-  version: 2
   build:
     jobs:
-      - "Alpine"
-      - "Arch"
-      - "CentOS-8-clang"
-      - "CentOS-8-gcc"
       - "CheckFormat"
-      - "Debian"
-      - "Fedora-clang"
-      - "Fedora-gcc"
       - "Sanitize"
-      - "Ubuntu-18.04"
-      - "Ubuntu-18.04-cuda10.2-build-only"
-      - "Ubuntu-18.04-cuda10.1-build-only"
+      - "Alpine":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
+      - "Arch":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
+      - "CentOS-8-clang":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
+      - "CentOS-8-gcc":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
+      - "Debian":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
+      - "Fedora-clang":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
+      - "Fedora-gcc":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
+      - "Ubuntu-18_04":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
+      - "Ubuntu-18_04-cuda10_2-build-only":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
+      - "Ubuntu-18_04-cuda10_1-build-only":
+          requires:
+            - "CheckFormat"
+            - "Sanitize"
