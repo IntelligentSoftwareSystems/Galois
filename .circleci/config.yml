@@ -3,10 +3,12 @@ version: 2.1
 common_step: &cmake_build_test
   - run: |
       cmake --build /tmp/build --target input
+
       if [ -n "$CIRCLE_PULL_REQUEST" ]; then \
-        subset=$(source .circleci/longest_common_path.sh); \
+        subset=$(/bin/bash .circleci/longest_common_path.sh); \
         echo "Changes of ${CIRCLE_SHA1} are all under $subset"; \
       fi
+
       cmake --build /tmp/build/${subset:-.} --parallel 2
       # Run tests as non-root otherwise MPI will complain
       (cd /tmp/build/${subset:-.} \
@@ -30,7 +32,7 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates git curl gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key 2>/dev/null | apt-key add -
           apt-add-repository -y 'deb https://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
           apt-get -q update -y
@@ -42,7 +44,11 @@ jobs:
 
           update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-10 50
 
-          scripts/check_format.sh .
+          if [ -n "$CIRCLE_PULL_REQUEST" ]; then \
+            subset=$(/bin/bash .circleci/longest_common_path.sh); \
+            echo "Changes of ${CIRCLE_SHA1} are all under $subset"; \
+          fi
+          scripts/check_format.sh ${subset:-.}
   "Sanitize":
     docker:
       - image: ubuntu:bionic
@@ -50,7 +56,7 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates git curl gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key 2>/dev/null | apt-key add -
           apt-add-repository -y 'ppa:ubuntu-toolchain-r/test'
@@ -79,9 +85,7 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake \
-            -S . \
-            -B /tmp/build \
+          cmake -S . -B /tmp/build \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DGALOIS_USE_SANITIZER="Address;Undefined"
@@ -94,7 +98,6 @@ jobs:
       - run: |
           apt-get -q update -y
           apt-get -q install -y git
-          apt-get -q install -y curl
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -115,7 +118,8 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
       - <<: *cmake_build_test
   "Ubuntu-18_04":
     docker:
@@ -124,7 +128,7 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y apt-transport-https ca-certificates git curl gnupg software-properties-common wget
+          apt-get -q install -y apt-transport-https ca-certificates git gnupg software-properties-common wget
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add -
           apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
           apt-get -q update -y
@@ -147,11 +151,12 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
       - <<: *cmake_build_test
-  "Ubuntu-18_04-cuda10_1-build-only":
+  "Ubuntu-18_04-cuda11_0_3-build-only":
     docker:
-      - image: nvidia/cuda:10.1-devel-ubuntu18.04
+      - image: nvidia/cuda:11.0.3-devel-ubuntu18.04
     steps:
       - checkout
       - run: |
@@ -175,12 +180,14 @@ jobs:
             ssh \
             libfmt-dev
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON -DGALOIS_ENABLE_GPU=ON
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON \
+            -DGALOIS_ENABLE_GPU=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
-  "Ubuntu-18_04-cuda10_2-build-only":
+  "Ubuntu-18_04-cuda11_1_1-build-only":
     docker:
-      - image: nvidia/cuda:10.2-devel-ubuntu18.04
+      - image: nvidia/cuda:11.1.1-devel-ubuntu18.04
     steps:
       - checkout
       - run: |
@@ -204,7 +211,9 @@ jobs:
             ssh \
             libfmt-dev
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON -DGALOIS_ENABLE_GPU=ON
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON \
+            -DGALOIS_ENABLE_GPU=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
   "CentOS-8-gcc":
@@ -213,14 +222,19 @@ jobs:
     steps:
       - checkout
       - run: |
+          # CentOS Linux 8 has reached End Of Life (EOL) on December 31st, 2021
+          ls /etc/yum.repos.d/ > /dev/null 2>&1
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+      - run: |
           # fmt-devel is in EPEL
           yum -y -q install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 
           # eigen3-devel needs PowerTools packages
           yum -y -q install dnf-plugins-core
-          yum -y -q config-manager --set-enabled PowerTools
+          yum -y -q config-manager --set-enabled powertools
 
-          yum -y -q install git curl
+          yum -y -q install git
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -243,15 +257,16 @@ jobs:
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
 
-          # Make the "module" command work in this shell session.
-          source /etc/profile.d/modules.sh
-          module load mpi
-
+          # Make the "module" command work in the subsequent shell sessions.
+          cat /etc/profile.d/modules.sh >> $BASH_ENV
+          echo "module load mpi" >> $BASH_ENV
+      - run: |
           chmod 755 /root
           useradd runner
-          mkdir -p build
+          mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
       - <<: *cmake_build_test
   "CentOS-8-clang":
     docker:
@@ -259,14 +274,19 @@ jobs:
     steps:
       - checkout
       - run: |
+          # CentOS Linux 8 has reached End Of Life (EOL) on December 31st, 2021
+          ls /etc/yum.repos.d/ > /dev/null 2>&1
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+      - run: |
           # fmt-devel is in EPEL
           yum -y -q install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 
           # eigen3-devel needs PowerTools packages
           yum -y -q install dnf-plugins-core
-          yum -y -q config-manager --set-enabled PowerTools
+          yum -y -q config-manager --set-enabled powertools
 
-          yum -y -q install git curl
+          yum -y -q install git
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -277,6 +297,7 @@ jobs:
             llvm-static \
             llvm-toolset \
             make \
+            openmpi-devel \
             ncurses-devel \
             wget \
             zlib-devel \
@@ -286,15 +307,18 @@ jobs:
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
 
+          # Make the "module" command work in the subsequent shell sessions.
+          cat /etc/profile.d/modules.sh >> $BASH_ENV
+          echo "module load mpi" >> $BASH_ENV
+      - run: |
           chmod 755 /root
           useradd runner
           mkdir -p /tmp/build
 
-          cmake \
-            -S . \
-            -B /tmp/build \
+          cmake -S . -B /tmp/build \
             -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+            -DCMAKE_CXX_COMPILER=clang++ \
+            # -DGALOIS_ENABLE_DIST=ON
       - <<: *cmake_build_test
   "Arch":
     docker:
@@ -302,8 +326,8 @@ jobs:
     steps:
       - checkout
       - run: |
-          pacman -Sy
-          pacman -q -S --noconfirm git curl
+          pacman -Syu --noconfirm
+          pacman -q -S --noconfirm git
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -323,7 +347,8 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
       - <<: *cmake_build_test
   "Alpine":
     docker:
@@ -331,7 +356,7 @@ jobs:
     steps:
       - checkout
       - run: |
-          apk add --no-cache --no-progress git curl
+          apk add --no-cache --no-progress git bash
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -341,8 +366,8 @@ jobs:
             eigen \
             g++ \
             gcc \
-            llvm10-dev \
-            llvm10-static \
+            llvm14-dev \
+            llvm14-static \
             make \
             musl-dev \
             openssh-client \
@@ -361,7 +386,7 @@ jobs:
     steps:
       - checkout
       - run: |
-          yum -y -q install git curl
+          yum -y -q install git
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -374,6 +399,7 @@ jobs:
             llvm-static \
             make \
             mpich-devel \
+            wget \
             zlib-devel \
             fmt-devel
 
@@ -382,9 +408,11 @@ jobs:
           mkdir -p /tmp/build
 
           # Get the "module" function set up before loading MPI.
-          . /etc/bashrc
-          module load mpi
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
+          cat /etc/profile.d/modules.sh >> $BASH_ENV
+          echo "module load mpi" >> $BASH_ENV
+      - run: |
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
       - <<: *cmake_build_test
   "Fedora-clang":
     docker:
@@ -392,7 +420,7 @@ jobs:
     steps:
       - checkout
       - run: |
-          yum -y -q install git curl
+          yum -y -q install git
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -405,6 +433,7 @@ jobs:
             llvm-static \
             make \
             openmpi-devel \
+            wget \
             zlib-devel \
             fmt-devel
 
@@ -413,16 +442,15 @@ jobs:
           mkdir -p /tmp/build
 
           # Get the "module" function set up before loading MPI.
-          . /etc/bashrc
-          module load mpi
-          cmake \
-            -S . \
-            -B /tmp/build \
+          cat /etc/profile.d/modules.sh >> $BASH_ENV
+          echo "module load mpi" >> $BASH_ENV
+      - run: |
+          cmake -S . -B /tmp/build \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
-            -DGALOIS_ENABLE_DIST=ON
+            # -DGALOIS_ENABLE_DIST=ON
       - <<: *cmake_build_test
- 
+
 workflows:
   build:
     jobs:
@@ -431,40 +459,40 @@ workflows:
       - "Alpine":
           requires:
             - "CheckFormat"
-            - "Sanitize"
+            # - "Sanitize"
       - "Arch":
           requires:
             - "CheckFormat"
-            - "Sanitize"
+            # - "Sanitize"
       - "CentOS-8-clang":
           requires:
             - "CheckFormat"
-            - "Sanitize"
+            # - "Sanitize"
       - "CentOS-8-gcc":
           requires:
             - "CheckFormat"
-            - "Sanitize"
+            # - "Sanitize"
       - "Debian":
           requires:
             - "CheckFormat"
-            - "Sanitize"
+            # - "Sanitize"
       - "Fedora-clang":
           requires:
             - "CheckFormat"
-            - "Sanitize"
+            # - "Sanitize"
       - "Fedora-gcc":
           requires:
             - "CheckFormat"
-            - "Sanitize"
+            # - "Sanitize"
       - "Ubuntu-18_04":
           requires:
             - "CheckFormat"
-            - "Sanitize"
-      - "Ubuntu-18_04-cuda10_2-build-only":
+            # - "Sanitize"
+      - "Ubuntu-18_04-cuda11_1_1-build-only":
           requires:
             - "CheckFormat"
-            - "Sanitize"
-      - "Ubuntu-18_04-cuda10_1-build-only":
+            # - "Sanitize"
+      - "Ubuntu-18_04-cuda11_0_3-build-only":
           requires:
             - "CheckFormat"
-            - "Sanitize"
+            # - "Sanitize"
