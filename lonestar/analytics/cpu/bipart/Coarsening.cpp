@@ -41,7 +41,7 @@ int hash(unsigned val) {
   return ((unsigned)(seed / 65536) % 32768);
 }
 
-void parallelRand(MetisGraph* graph, int) {
+void parallelRand(std::shared_ptr<MetisGraph> graph, int) {
 
   GGraph* fineGGraph = graph->getFinerGraph()->getGraph();
 
@@ -147,7 +147,7 @@ void MDEG_f(GNode node, GGraph* fineGGraph) {
 }
 
 template <MatchingPolicy matcher>
-void parallelPrioRand(MetisGraph* graph, int iter) {
+void parallelPrioRand(std::shared_ptr<MetisGraph> graph, int iter) {
 
   GGraph* fineGGraph = graph->getFinerGraph()->getGraph();
   parallelRand(graph, iter);
@@ -191,8 +191,8 @@ void parallelPrioRand(MetisGraph* graph, int iter) {
 
 // hyper edge matching
 template <MatchingPolicy matcher>
-void parallelHMatchAndCreateNodes(MetisGraph* graph, int iter, GNodeBag& bag,
-                                  std::vector<bool>& hedges,
+void parallelHMatchAndCreateNodes(std::shared_ptr<MetisGraph> graph, int iter,
+                                  GNodeBag& bag, std::vector<bool>& hedges,
                                   galois::LargeArray<unsigned>& weight) {
   parallelPrioRand<matcher>(graph, iter);
   GGraph* fineGGraph = graph->getFinerGraph()->getGraph();
@@ -258,7 +258,8 @@ void parallelHMatchAndCreateNodes(MetisGraph* graph, int iter, GNodeBag& bag,
     hedges[item] = true;
 }
 
-void moreCoarse(MetisGraph* graph, galois::LargeArray<unsigned>& weight) {
+void moreCoarse(std::shared_ptr<MetisGraph> graph,
+                galois::LargeArray<unsigned>& weight) {
 
   GGraph* fineGGraph = graph->getFinerGraph()->getGraph();
   typedef std::vector<GNode> VecTy;
@@ -327,7 +328,7 @@ void moreCoarse(MetisGraph* graph, galois::LargeArray<unsigned>& weight) {
 }
 
 // Coarsening phaseII
-void coarsePhaseII(MetisGraph* graph, std::vector<bool>& hedges,
+void coarsePhaseII(std::shared_ptr<MetisGraph> graph, std::vector<bool>& hedges,
                    galois::LargeArray<unsigned>& weight) {
 
   GGraph* fineGGraph = graph->getFinerGraph()->getGraph();
@@ -401,7 +402,7 @@ void findLoneNodes(GGraph& graph) {
 }
 
 // create coarsened graphs
-void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag,
+void parallelCreateEdges(std::shared_ptr<MetisGraph> graph, GNodeBag& bag,
                          std::vector<bool>& hedges,
                          galois::LargeArray<unsigned>& weight) {
 
@@ -593,8 +594,10 @@ void parallelCreateEdges(MetisGraph* graph, GNodeBag& bag,
   inBag.deallocate();
 }
 
-void findMatching(MetisGraph* coarseMetisGraph, scheduleMode sch, int iter) {
-  MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
+void findMatching(std::shared_ptr<MetisGraph> coarseMetisGraph,
+                  scheduleMode sch, int iter) {
+  std::shared_ptr<MetisGraph> fineMetisGraph =
+      coarseMetisGraph->getFinerGraph();
   GNodeBag nodes;
   int sz = coarseMetisGraph->getFinerGraph()->getGraph()->hedges;
   std::vector<bool> hedges(sz, false);
@@ -648,25 +651,27 @@ void findMatching(MetisGraph* coarseMetisGraph, scheduleMode sch, int iter) {
   weight.deallocate();
 }
 
-MetisGraph* coarsenOnce(MetisGraph* fineMetisGraph, scheduleMode sch,
-                        int iter) {
-  MetisGraph* coarseMetisGraph = new MetisGraph(fineMetisGraph);
+std::shared_ptr<MetisGraph>
+coarsenOnce(std::shared_ptr<MetisGraph> fineMetisGraph, scheduleMode sch,
+            int iter) {
+  std::shared_ptr<MetisGraph> coarseMetisGraph =
+      std::make_shared<MetisGraph>(fineMetisGraph);
   findMatching(coarseMetisGraph, sch, iter);
   return coarseMetisGraph;
 }
 
 } // namespace
 
-MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
-                    scheduleMode sch) {
+std::shared_ptr<MetisGraph> coarsen(std::shared_ptr<MetisGraph> fineMetisGraph,
+                                    unsigned coarsenTo, scheduleMode sch) {
 
-  MetisGraph* coarseGraph = fineMetisGraph;
-  unsigned size           = fineMetisGraph->getGraph()->hnodes;
-  unsigned hedgeSize      = 0;
-  const float ratio       = 55.0 / 45.0;
-  const float tol         = std::max(ratio, 1 - ratio) - 1;
-  const int hi            = (1 + tol) * size / (2 + tol);
-  LIMIT                   = hi / 4;
+  std::shared_ptr<MetisGraph> coarseGraph = fineMetisGraph;
+  unsigned size                           = fineMetisGraph->getGraph()->hnodes;
+  unsigned hedgeSize                      = 0;
+  const float ratio                       = 55.0 / 45.0;
+  const float tol                         = std::max(ratio, 1 - ratio) - 1;
+  const int hi                            = (1 + tol) * size / (2 + tol);
+  LIMIT                                   = hi / 4;
 
   unsigned Size    = size;
   unsigned iterNum = 0;

@@ -113,7 +113,7 @@ void initGain(GGraph& g) {
 } // namespace
 
 // Final
-void partition(MetisGraph* mcg, unsigned K) {
+void partition(std::shared_ptr<MetisGraph> mcg, unsigned K) {
   GGraph* g = mcg->getGraph();
   galois::GAccumulator<unsigned int> accum;
   int waccum;

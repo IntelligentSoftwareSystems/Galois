@@ -166,29 +166,30 @@ private:
 };
 
 // Structure to keep track of graph hirarchy
-class MetisGraph {
+class MetisGraph : public std::enable_shared_from_this<MetisGraph> {
   MetisGraph* coarser;
-  MetisGraph* finer;
+  std::shared_ptr<MetisGraph> finer;
 
   GGraph graph;
 
 public:
-  MetisGraph() : coarser(0), finer(0) {}
+  MetisGraph() : coarser(0) {}
 
-  explicit MetisGraph(MetisGraph* finerGraph) : coarser(0), finer(finerGraph) {
+  explicit MetisGraph(std::shared_ptr<MetisGraph> finerGraph)
+      : coarser(0), finer(finerGraph) {
     finer->coarser = this;
   }
 
   const GGraph* getGraph() const { return &graph; }
   GGraph* getGraph() { return &graph; }
-  MetisGraph* getFinerGraph() const { return finer; }
+  std::shared_ptr<MetisGraph> getFinerGraph() const { return finer; }
   MetisGraph* getCoarserGraph() const { return coarser; }
 
   // unsigned getNumNodes() { return std::distance(graph.cellList().begin(),
   // graph.cellList().end()); }
 
   unsigned getTotalWeight() {
-    MetisGraph* f = this;
+    std::shared_ptr<MetisGraph> f = shared_from_this();
     while (f->finer)
       f = f->finer;
     // return std::distance(f->graph.cellList().begin(),
@@ -200,12 +201,13 @@ public:
 // Metrics
 unsigned graphStat(GGraph& graph);
 // Coarsening
-MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo,
-                    scheduleMode sMode);
+std::shared_ptr<MetisGraph> coarsen(std::shared_ptr<MetisGraph> fineMetisGraph,
+                                    unsigned coarsenTo, scheduleMode sMode);
 
 // Partitioning
-void partition(MetisGraph*, unsigned);
+void partition(std::shared_ptr<MetisGraph>, unsigned);
 // Refinement
-void refine(MetisGraph* coarseGraph, unsigned K, double imbalance);
+void refine(std::shared_ptr<MetisGraph> coarseGraph, unsigned K,
+            double imbalance);
 
 #endif

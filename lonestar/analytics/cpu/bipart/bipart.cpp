@@ -103,13 +103,15 @@ double Rtime = 0.0f;
 /**
  * Partitioning
  */
-void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
+void Partition(std::shared_ptr<MetisGraph> metisGraph, unsigned coarsenTo,
+               unsigned K) {
   galois::StatTimer execTime("Timer_0");
   execTime.start();
 
   galois::StatTimer T("CoarsenSEP");
   T.start();
-  MetisGraph* mcg = coarsen(metisGraph, coarsenTo, schedulingMode);
+  std::shared_ptr<MetisGraph> mcg =
+      coarsen(metisGraph, coarsenTo, schedulingMode);
   T.stop();
 
   galois::StatTimer T2("PartitionSEP");
@@ -214,8 +216,8 @@ int main(int argc, char** argv) {
                " to indicate the input is a hMetisGraph graph.");
   }
 
-  MetisGraph metisGraph;
-  GGraph& graph = *metisGraph.getGraph();
+  std::shared_ptr<MetisGraph> metisGraph(new MetisGraph());
+  GGraph& graph = *metisGraph->getGraph();
   std::ifstream f(inputFile.c_str());
   std::string line;
   std::getline(f, line);
@@ -298,7 +300,7 @@ int main(int argc, char** argv) {
       },
       galois::steal(), galois::loopname("initPart"));
 
-  Partition(&metisGraph, csize, numPartitions);
+  Partition(metisGraph, csize, numPartitions);
 
   const int k = numPartitions;
   // calculating number of iterations/levels required
@@ -381,8 +383,8 @@ int main(int argc, char** argv) {
     // calling Partition for each partition number
     for (unsigned i : toProcess) {
       if (kValue[i] > 1) {
-        MetisGraph metisG;
-        GGraph& gr = *metisG.getGraph();
+        std::shared_ptr<MetisGraph> metisG;
+        GGraph& gr = *metisG->getGraph();
 
         unsigned ed = 0;
 
@@ -446,20 +448,9 @@ int main(int argc, char** argv) {
             },
             galois::steal(), galois::loopname("build graph: recursion level"));
 
-        Partition(&metisG, csize, kValue[i]);
+        Partition(metisG, csize, kValue[i]);
 
-        MetisGraph* mcg = &metisG;
-
-        // now free up the memory by deleting all coarsened graphs
-        while (mcg->getCoarserGraph() != NULL) {
-          mcg = mcg->getCoarserGraph();
-        }
-
-        while (mcg->getFinerGraph() != NULL &&
-               mcg->getFinerGraph()->getFinerGraph() != NULL) {
-          mcg = mcg->getFinerGraph();
-          delete mcg->getCoarserGraph();
-        }
+        std::shared_ptr<MetisGraph> mcg = metisG;
 
         int tmp                   = kValue[i];
         kValue[i]                 = (tmp + 1) / 2;
@@ -481,7 +472,6 @@ int main(int argc, char** argv) {
             galois::steal(),
             galois::loopname("set part: inside recursive call"));
 
-        delete mcg;
       } // end if
     }   // end for
 
