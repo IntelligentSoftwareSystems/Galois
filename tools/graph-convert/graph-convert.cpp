@@ -33,6 +33,7 @@
 #include <vector>
 #include <random>
 #include <string>
+#include <optional>
 
 #include <fcntl.h>
 #include <cstdlib>

@@ -103,13 +103,15 @@ double Rtime = 0.0f;
 /**
  * Partitioning
  */
-void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
+void Partition(std::shared_ptr<MetisGraph> metisGraph, unsigned coarsenTo,
+               unsigned K) {
   galois::StatTimer execTime("Timer_0");
   execTime.start();
 
   galois::StatTimer T("CoarsenSEP");
   T.start();
-  MetisGraph* mcg = coarsen(metisGraph, coarsenTo, schedulingMode);
+  std::shared_ptr<MetisGraph> mcg =
+      coarsen(metisGraph, coarsenTo, schedulingMode);
   T.stop();
 
   galois::StatTimer T2("PartitionSEP");
@@ -121,9 +123,9 @@ void Partition(MetisGraph* metisGraph, unsigned coarsenTo, unsigned K) {
   T3.start();
   refine(mcg, K, imbalance);
   T3.stop();
-  Ctime += (T.get()/1000.0f);
-  Ptime += (T2.get()/1000.0f);
-  Rtime += (T3.get()/1000.0f);
+  Ctime += (T.get() / 1000.0f);
+  Ptime += (T2.get() / 1000.0f);
+  Rtime += (T3.get() / 1000.0f);
 
   execTime.stop();
 }
@@ -154,7 +156,7 @@ int computingBalance(GGraph& g) {
     unsigned pp = g.getData(c).getPart();
     parts[pp]++;
   }
-  for (unsigned i = 0; i <numPartitions; i++) {
+  for (unsigned i = 0; i < numPartitions; i++) {
     if (parts[i] > max)
       max = parts[i];
   }
@@ -214,8 +216,8 @@ int main(int argc, char** argv) {
                " to indicate the input is a hMetisGraph graph.");
   }
 
-  MetisGraph metisGraph;
-  GGraph& graph = *metisGraph.getGraph();
+  std::shared_ptr<MetisGraph> metisGraph(new MetisGraph());
+  GGraph& graph = *metisGraph->getGraph();
   std::ifstream f(inputFile.c_str());
   std::string line;
   std::getline(f, line);
@@ -298,7 +300,7 @@ int main(int argc, char** argv) {
       },
       galois::steal(), galois::loopname("initPart"));
 
-  Partition(&metisGraph, csize, numPartitions);
+  Partition(metisGraph, csize, numPartitions);
 
   const int k = numPartitions;
   // calculating number of iterations/levels required
@@ -381,8 +383,8 @@ int main(int argc, char** argv) {
     // calling Partition for each partition number
     for (unsigned i : toProcess) {
       if (kValue[i] > 1) {
-        MetisGraph metisG;
-        GGraph& gr = *metisG.getGraph();
+        std::shared_ptr<MetisGraph> metisG;
+        GGraph& gr = *metisG->getGraph();
 
         unsigned ed = 0;
 
@@ -415,13 +417,13 @@ int main(int argc, char** argv) {
             galois::steal(), galois::loopname("populate edge ids"));
 
         uint64_t num_edges_acc = 0;
-        //galois::do_all(
-          //  galois::iterate(uint32_t{0}, totalnodes),
-            for(uint32_t c = 0;c<totalnodes;c++) {
-              pre_edges[c] = edges_ids[c].size();
-              num_edges_acc += pre_edges[c];
-            }
-            //galois::steal(), galois::loopname("set pre edges"));
+        // galois::do_all(
+        //  galois::iterate(uint32_t{0}, totalnodes),
+        for (uint32_t c = 0; c < totalnodes; c++) {
+          pre_edges[c] = edges_ids[c].size();
+          num_edges_acc += pre_edges[c];
+        }
+        // galois::steal(), galois::loopname("set pre edges"));
 
         edges = num_edges_acc;
 
@@ -446,20 +448,9 @@ int main(int argc, char** argv) {
             },
             galois::steal(), galois::loopname("build graph: recursion level"));
 
-        Partition(&metisG, csize, kValue[i]);
+        Partition(metisG, csize, kValue[i]);
 
-        MetisGraph* mcg = &metisG;
-
-        // now free up the memory by deleting all coarsened graphs
-        while (mcg->getCoarserGraph() != NULL) {
-          mcg = mcg->getCoarserGraph();
-        }
-
-        while (mcg->getFinerGraph() != NULL &&
-               mcg->getFinerGraph()->getFinerGraph() != NULL) {
-          mcg = mcg->getFinerGraph();
-          delete mcg->getCoarserGraph();
-        }
+        std::shared_ptr<MetisGraph> mcg = metisG;
 
         int tmp                   = kValue[i];
         kValue[i]                 = (tmp + 1) / 2;
@@ -481,27 +472,26 @@ int main(int argc, char** argv) {
             galois::steal(),
             galois::loopname("set part: inside recursive call"));
 
-        delete mcg;
       } // end if
     }   // end for
 
     toProcess = toProcessNew;
     toProcessNew.clear();
   } // end while
-  std::cout<<"Coarsening time(s):,"<<Ctime<<"\n";
-  std::cout<<"Partitiong time(s):,"<<Ptime<<"\n";
-  std::cout<<"Refinement time(s):,"<<Rtime<<"\n";
-  std::cout<<"\n";
-  std::cout<<"Edge Cut,"<<computingCut(graph)<<"\n\n";
+  std::cout << "Coarsening time(s):," << Ctime << "\n";
+  std::cout << "Partitiong time(s):," << Ptime << "\n";
+  std::cout << "Refinement time(s):," << Rtime << "\n";
+  std::cout << "\n";
+  std::cout << "Edge Cut," << computingCut(graph) << "\n\n";
 
   galois::runtime::reportStat_Single("BiPart", "Edge Cut", computingCut(graph));
-  //galois::runtime::reportStat_Single("BiPart", "zero-one",
+  // galois::runtime::reportStat_Single("BiPart", "zero-one",
   //                                   computingBalance(graph));
 
   totalTime.stop();
   if (output) {
 
-    std::vector<std::vector<uint64_t> >parts(numPartitions);
+    std::vector<std::vector<uint64_t>> parts(numPartitions);
 
     for (GNode n = graph.hedges; n < graph.size(); n++) {
       unsigned p = graph.getData(n).getPart();
@@ -511,9 +501,9 @@ int main(int argc, char** argv) {
     std::ofstream outputFile(outfile.c_str());
 
     for (unsigned i = 0; i < numPartitions; i++) {
-      outputFile << i+1 << " ";
-      for (auto v : parts[i]) 
-        outputFile << v << " "; 
+      outputFile << i + 1 << " ";
+      for (auto v : parts[i])
+        outputFile << v << " ";
       outputFile << "\n";
     }
     outputFile.close();

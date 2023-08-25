@@ -28,7 +28,7 @@
 
 namespace {
 
-void projectPart(MetisGraph* Graph) {
+void projectPart(std::shared_ptr<MetisGraph> Graph) {
   GGraph* fineGraph   = Graph->getFinerGraph()->getGraph();
   GGraph* coarseGraph = Graph->getGraph();
   galois::do_all(
@@ -534,25 +534,26 @@ bool isPT(int n) {
   return (ceil(log2(n)) == floor(log2(n)));
 }
 
-void refine(MetisGraph* coarseGraph, unsigned K, double imbalance) {
+void refine(std::shared_ptr<MetisGraph> coarseGraph, unsigned K,
+            double imbalance) {
   float ratio = 0.0f;
   float tol   = 0.0f;
   bool flag   = isPT(K);
   if (flag) {
-    ratio = (50.0f + (double) imbalance)/(50.0f - (double) imbalance);
+    ratio = (50.0f + (double)imbalance) / (50.0f - (double)imbalance);
     tol   = std::max(ratio, 1 - ratio) - 1;
   } else {
     ratio = ((float)((K + 1) / 2)) / ((float)(K / 2)); // change if needed
     tol   = std::max(ratio, 1 - ratio) - 1;
   }
   do {
-    MetisGraph* fineGraph = coarseGraph->getFinerGraph();
-    auto gg               = coarseGraph->getGraph();
+    std::shared_ptr<MetisGraph> fineGraph = coarseGraph->getFinerGraph();
+    auto gg                               = coarseGraph->getGraph();
 
     parallel_refine_KF(*gg, tol, 2);
     parallel_make_balance(*gg, tol, 2);
     bool do_pro = true;
-    if (fineGraph && do_pro) {
+    if (fineGraph.get() && do_pro) {
       projectPart(coarseGraph);
     }
   } while ((coarseGraph = coarseGraph->getFinerGraph()));

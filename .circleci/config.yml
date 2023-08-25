@@ -1,4 +1,19 @@
-version: 2
+version: 2.1
+
+common_step: &cmake_build_test
+  - run: |
+      cmake --build /tmp/build --target input
+
+      if [ -n "$CIRCLE_PULL_REQUEST" ]; then \
+        subset=$(/bin/bash .circleci/longest_common_path.sh); \
+        echo "Changes of ${CIRCLE_SHA1} are all under $subset"; \
+      fi
+
+      cmake --build /tmp/build/${subset:-.} --parallel 2
+      # Run tests as non-root otherwise MPI will complain
+      (cd /tmp/build/${subset:-.} \
+        && chown -R runner . \
+        && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
 
 # TODO: These builds are currently configured to
 # install the needed dependencies in each container
@@ -29,7 +44,11 @@ jobs:
 
           update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-10 50
 
-          scripts/check_format.sh .
+          if [ -n "$CIRCLE_PULL_REQUEST" ]; then \
+            subset=$(/bin/bash .circleci/longest_common_path.sh); \
+            echo "Changes of ${CIRCLE_SHA1} are all under $subset"; \
+          fi
+          scripts/check_format.sh ${subset:-.}
   "Sanitize":
     docker:
       - image: ubuntu:bionic
@@ -66,18 +85,11 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake \
-            -S . \
-            -B /tmp/build \
+          cmake -S . -B /tmp/build \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DGALOIS_USE_SANITIZER="Address;Undefined"
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          # Run tests as non-root otherwise MPI will complain
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+      - <<: *cmake_build_test
   "Debian":
     docker:
       - image: debian:10
@@ -106,14 +118,10 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          # Run tests as non-root otherwise MPI will complain
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
-  "Ubuntu-18.04":
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
+      - <<: *cmake_build_test
+  "Ubuntu-18_04":
     docker:
       - image: ubuntu:18.04
     steps:
@@ -143,15 +151,12 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
-  "Ubuntu-18.04-cuda10.1-build-only":
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
+      - <<: *cmake_build_test
+  "Ubuntu-18_04-cuda11_0_3-build-only":
     docker:
-      - image: nvidia/cuda:10.1-devel-ubuntu18.04
+      - image: nvidia/cuda:11.0.3-devel-ubuntu18.04
     steps:
       - checkout
       - run: |
@@ -175,12 +180,14 @@ jobs:
             ssh \
             libfmt-dev
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON -DGALOIS_ENABLE_GPU=ON
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON \
+            -DGALOIS_ENABLE_GPU=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
-  "Ubuntu-18.04-cuda10.2-build-only":
+  "Ubuntu-18_04-cuda11_1_1-build-only":
     docker:
-      - image: nvidia/cuda:10.2-devel-ubuntu18.04
+      - image: nvidia/cuda:11.1.1-devel-ubuntu18.04
     steps:
       - checkout
       - run: |
@@ -204,7 +211,9 @@ jobs:
             ssh \
             libfmt-dev
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON -DGALOIS_ENABLE_GPU=ON
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON \
+            -DGALOIS_ENABLE_GPU=ON
           cmake --build /tmp/build --target input
           cmake --build /tmp/build --parallel 2
   "CentOS-8-gcc":
@@ -213,12 +222,17 @@ jobs:
     steps:
       - checkout
       - run: |
+          # CentOS Linux 8 has reached End Of Life (EOL) on December 31st, 2021
+          ls /etc/yum.repos.d/ > /dev/null 2>&1
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+      - run: |
           # fmt-devel is in EPEL
           yum -y -q install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 
           # eigen3-devel needs PowerTools packages
           yum -y -q install dnf-plugins-core
-          yum -y -q config-manager --set-enabled PowerTools
+          yum -y -q config-manager --set-enabled powertools
 
           yum -y -q install git
       - run: git submodule sync
@@ -243,32 +257,34 @@ jobs:
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
 
-          # Make the "module" command work in this shell session.
-          source /etc/profile.d/modules.sh
-          module load mpi
-
+          # Make the "module" command work in the subsequent shell sessions.
+          cat /etc/profile.d/modules.sh >> $BASH_ENV
+          echo "module load mpi" >> $BASH_ENV
+      - run: |
           chmod 755 /root
           useradd runner
-          mkdir -p build
+          mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
+      - <<: *cmake_build_test
   "CentOS-8-clang":
     docker:
       - image: centos:8
     steps:
       - checkout
       - run: |
+          # CentOS Linux 8 has reached End Of Life (EOL) on December 31st, 2021
+          ls /etc/yum.repos.d/ > /dev/null 2>&1
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+      - run: |
           # fmt-devel is in EPEL
           yum -y -q install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 
           # eigen3-devel needs PowerTools packages
           yum -y -q install dnf-plugins-core
-          yum -y -q config-manager --set-enabled PowerTools
+          yum -y -q config-manager --set-enabled powertools
 
           yum -y -q install git
       - run: git submodule sync
@@ -281,6 +297,7 @@ jobs:
             llvm-static \
             llvm-toolset \
             make \
+            openmpi-devel \
             ncurses-devel \
             wget \
             zlib-devel \
@@ -290,27 +307,26 @@ jobs:
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/cmake /usr/local/bin/cmake
           ln -s /usr/local/cmake-3.17.0-Linux-x86_64/bin/ctest /usr/local/bin/ctest
 
+          # Make the "module" command work in the subsequent shell sessions.
+          cat /etc/profile.d/modules.sh >> $BASH_ENV
+          echo "module load mpi" >> $BASH_ENV
+      - run: |
           chmod 755 /root
           useradd runner
           mkdir -p /tmp/build
 
-          cmake \
-            -S . \
-            -B /tmp/build \
+          cmake -S . -B /tmp/build \
             -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+            -DCMAKE_CXX_COMPILER=clang++ \
+            # -DGALOIS_ENABLE_DIST=ON
+      - <<: *cmake_build_test
   "Arch":
     docker:
-      - image: archlinux/base
+      - image: archlinux:base
     steps:
       - checkout
       - run: |
-          pacman -Sy
+          pacman -Syu --noconfirm
           pacman -q -S --noconfirm git
       - run: git submodule sync
       - run: git submodule update --init
@@ -331,19 +347,16 @@ jobs:
           useradd runner
           mkdir -p /tmp/build
 
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
+      - <<: *cmake_build_test
   "Alpine":
     docker:
       - image: alpine:latest
     steps:
       - checkout
       - run: |
-          apk add --no-cache --no-progress git
+          apk add --no-cache --no-progress git bash
       - run: git submodule sync
       - run: git submodule update --init
       - run: |
@@ -353,8 +366,8 @@ jobs:
             eigen \
             g++ \
             gcc \
-            llvm9-dev \
-            llvm9-static \
+            llvm14-dev \
+            llvm14-static \
             make \
             musl-dev \
             openssh-client \
@@ -366,11 +379,7 @@ jobs:
           mkdir -p /tmp/build
 
           cmake -S . -B /tmp/build
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+      - <<: *cmake_build_test
   "Fedora-gcc":
     docker:
       - image: fedora:latest
@@ -390,6 +399,7 @@ jobs:
             llvm-static \
             make \
             mpich-devel \
+            wget \
             zlib-devel \
             fmt-devel
 
@@ -398,14 +408,12 @@ jobs:
           mkdir -p /tmp/build
 
           # Get the "module" function set up before loading MPI.
-          . /etc/bashrc
-          module load mpi
-          cmake -S . -B /tmp/build -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
+          cat /etc/profile.d/modules.sh >> $BASH_ENV
+          echo "module load mpi" >> $BASH_ENV
+      - run: |
+          cmake -S . -B /tmp/build \
+            -DGALOIS_ENABLE_DIST=ON
+      - <<: *cmake_build_test
   "Fedora-clang":
     docker:
       - image: fedora:latest
@@ -425,6 +433,7 @@ jobs:
             llvm-static \
             make \
             openmpi-devel \
+            wget \
             zlib-devel \
             fmt-devel
 
@@ -433,33 +442,57 @@ jobs:
           mkdir -p /tmp/build
 
           # Get the "module" function set up before loading MPI.
-          . /etc/bashrc
-          module load mpi
-          cmake \
-            -S . \
-            -B /tmp/build \
+          cat /etc/profile.d/modules.sh >> $BASH_ENV
+          echo "module load mpi" >> $BASH_ENV
+      - run: |
+          cmake -S . -B /tmp/build \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
-            -DGALOIS_ENABLE_DIST=ON
-          cmake --build /tmp/build --target input
-          cmake --build /tmp/build --parallel 2
-          (cd /tmp/build \
-            && chown -R runner . \
-            && su runner -c "ctest --output-on-failure --label-regex quick --parallel 2")
- 
+            # -DGALOIS_ENABLE_DIST=ON
+      - <<: *cmake_build_test
+
 workflows:
-  version: 2
   build:
     jobs:
-      - "Alpine"
-      - "Arch"
-      - "CentOS-8-clang"
-      - "CentOS-8-gcc"
       - "CheckFormat"
-      - "Debian"
-      - "Fedora-clang"
-      - "Fedora-gcc"
       - "Sanitize"
-      - "Ubuntu-18.04"
-      - "Ubuntu-18.04-cuda10.2-build-only"
-      - "Ubuntu-18.04-cuda10.1-build-only"
+      - "Alpine":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
+      - "Arch":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
+      - "CentOS-8-clang":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
+      - "CentOS-8-gcc":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
+      - "Debian":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
+      - "Fedora-clang":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
+      - "Fedora-gcc":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
+      - "Ubuntu-18_04":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
+      - "Ubuntu-18_04-cuda11_1_1-build-only":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
+      - "Ubuntu-18_04-cuda11_0_3-build-only":
+          requires:
+            - "CheckFormat"
+            # - "Sanitize"
