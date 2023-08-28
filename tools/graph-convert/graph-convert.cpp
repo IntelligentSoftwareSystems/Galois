@@ -687,7 +687,7 @@ struct Mtx2Gr : public HasNoVoidSpecialization {
       }
 
       for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
-        if ( (nedges / 500 > 0) && (edge_num % (nedges / 500)) == 0) {
+        if ((nedges / 500 > 0) && (edge_num % (nedges / 500)) == 0) {
           printf("Phase %d: current edge progress %lf%%\n", phase,
                  ((double)edge_num / nedges) * 100);
         }
