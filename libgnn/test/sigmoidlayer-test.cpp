@@ -15,8 +15,8 @@ int main() {
   galois::setActiveThreads(1);
 
   // load test graph
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, false);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, false, false);
 
   // input/output columns must be same in softmax
   galois::GNNLayerDimensions dimension_0;
@@ -51,7 +51,7 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
   // train mode
-  auto output_layer = std::make_unique<galois::SigmoidLayer>(
+  auto output_layer = std::make_unique<galois::SigmoidLayer<char, void>>(
       3, test_graph, &p_back, dimension_0);
   output_layer->ForwardPhase(softmax_input);
 

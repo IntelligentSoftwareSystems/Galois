@@ -1443,7 +1443,7 @@ private:
                         typename FnTy::ValTy::value_type* location_to_write) {
     if (syncType == syncReduce) {
       FnTy::ExtractDirect(lid, location_to_write);
-      char dummy = 0;
+      typename FnTy::NodeTy dummy{};
       FnTy::reset(lid, dummy);
     } else {
       FnTy::ExtractDirect(lid, location_to_write);

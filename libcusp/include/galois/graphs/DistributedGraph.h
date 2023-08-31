@@ -436,7 +436,7 @@ private:
       // TODO(hc):
       auto r = galois::graphs::divideNodesBinarySearch(
           numGlobalNodes, numGlobalEdges, 0, edgeWeight, (id + d * numHosts),
-              numHosts * DecomposeFactor, outIndices, scalefactor);
+          numHosts * DecomposeFactor, outIndices, scalefactor);
       gid2host[id + d * numHosts].first  = *(r.first.first);
       gid2host[id + d * numHosts].second = *(r.first.second);
     }
@@ -504,9 +504,9 @@ private:
    * @todo make this function work with decompose factor
    */
   void computeMastersBalancedNodesAndEdges(
-      uint64_t numGlobalNodes, uint64_t numGlobalEdges,
-      uint64_t* outIndices, const std::vector<unsigned>& scalefactor,
-      uint32_t nodeWeight, uint32_t edgeWeight, unsigned) {
+      uint64_t numGlobalNodes, uint64_t numGlobalEdges, uint64_t* outIndices,
+      const std::vector<unsigned>& scalefactor, uint32_t nodeWeight,
+      uint32_t edgeWeight, unsigned) {
     if (nodeWeight == 0) {
       nodeWeight = numGlobalEdges / numGlobalNodes; // average degree
     }
@@ -517,8 +517,8 @@ private:
     auto& net = galois::runtime::getSystemNetworkInterface();
     gid2host.resize(numHosts);
     auto r = galois::graphs::divideNodesBinarySearch(
-        numGlobalNodes, numGlobalEdges, nodeWeight, edgeWeight,
-            id, numHosts, outIndices, scalefactor);
+        numGlobalNodes, numGlobalEdges, nodeWeight, edgeWeight, id, numHosts,
+        outIndices, scalefactor);
     gid2host[id].first  = *r.first.first;
     gid2host[id].second = *r.first.second;
     for (unsigned h = 0; h < numHosts; ++h) {
@@ -542,7 +542,6 @@ private:
     }
     increment_evilPhase();
   }
-
 
 protected:
   /**
@@ -628,19 +627,17 @@ protected:
     // compute masters for all nodes
     switch (masters_distribution) {
     case BALANCED_MASTERS:
-      computeMastersBlockedNodes(
-          numGlobalNodes, scalefactor, DecomposeFactor);
+      computeMastersBlockedNodes(numGlobalNodes, scalefactor, DecomposeFactor);
       break;
     case BALANCED_MASTERS_AND_EDGES:
-      computeMastersBalancedNodesAndEdges(
-          numGlobalNodes, numGlobalEdges, outIndices,
-          scalefactor, nodeWeight, edgeWeight, DecomposeFactor);
+      computeMastersBalancedNodesAndEdges(numGlobalNodes, numGlobalEdges,
+                                          outIndices, scalefactor, nodeWeight,
+                                          edgeWeight, DecomposeFactor);
       break;
     case BALANCED_EDGES_OF_MASTERS:
     default:
-      computeMastersBalancedEdges(
-          numGlobalNodes, numGlobalEdges, outIndices,
-          scalefactor, edgeWeight, DecomposeFactor);
+      computeMastersBalancedEdges(numGlobalNodes, numGlobalEdges, outIndices,
+                                  scalefactor, edgeWeight, DecomposeFactor);
       break;
     }
 
@@ -657,7 +654,6 @@ protected:
 #endif
     return numNodes_to_divide;
   }
-
 
   //! reader assignment from a file
   //! corresponds to master assignment if using an edge cut

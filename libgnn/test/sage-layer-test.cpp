@@ -14,8 +14,8 @@ int main() {
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
   // load test graph
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   galois::GNNLayerDimensions dimension_0;
   dimension_0.input_rows     = 7;
@@ -32,8 +32,8 @@ int main() {
   std::vector<galois::GNNFloat> back_matrix(21);
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
-  std::unique_ptr<galois::SAGELayer> layer_0 =
-      std::make_unique<galois::SAGELayer>(0, test_graph, &p_null, dimension_0,
+  std::unique_ptr<galois::SAGELayer<char, void>> layer_0 =
+      std::make_unique<galois::SAGELayer<char, void>>(0, test_graph, &p_null, dimension_0,
                                           dcon, scon);
   layer_0->InitAllWeightsTo1();
   // sage weights for self
@@ -113,7 +113,7 @@ int main() {
 
   // create layer 1 for testing backward prop actually giving weights back
 
-  auto layer_1 = std::make_unique<galois::SAGELayer>(1, test_graph, &p_back,
+  auto layer_1 = std::make_unique<galois::SAGELayer<char, void>>(1, test_graph, &p_back,
                                                      dimension_0, dcon, scon);
   layer_1->InitAllWeightsTo1();
   layer_1->InitSelfWeightsTo1();
@@ -205,7 +205,7 @@ int main() {
   // (verification requires floating point accuracy or setting a seed which I
   // don't have time for at the moment
   // TODO in future maybe add better unit test for this
-  auto layer_2 = std::make_unique<galois::SAGELayer>(1, test_graph, &p_back,
+  auto layer_2 = std::make_unique<galois::SAGELayer<char, void>>(1, test_graph, &p_back,
                                                      dimension_0, config, scon);
   galois::PointerWithSize<galois::GNNFloat> l2_fo =
       layer_2->ForwardPhase(test_graph.GetLocalFeatures());

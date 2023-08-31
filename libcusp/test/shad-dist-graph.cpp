@@ -29,14 +29,19 @@ int main() {
   //M = 1;
   galois::setActiveThreads(M);
 
-  shad::ShadGraphConverter<uint64_t> shadConverter;
+  shad::ShadGraphConverter shadConverter;
   size_t numNodes{0}, numEdges{0};
 
-  std::string filename = "/home/hochan/data.csv";
+  // TODO(hc): This path should be properly set based on user's environment.
+  // Later, this test dataset will be included in the Galois repository, and
+  // will use a relative path.
+  std::string filename = "/home/hochan/data.01.csv";
   shadConverter.readSHADFile(filename, &numNodes, &numEdges);
-  std::unique_ptr<galois::graphs::DistGraph<uint64_t, uint64_t>>
-      graph = galois::cuspPartitionGraph<GenericCVC, uint64_t, uint64_t>(
+  std::unique_ptr<galois::graphs::DistGraph<shad::ShadNodeTy, shad::ShadEdgeTy>>
+      graph = galois::cuspPartitionGraph<GenericCVC, shad::ShadNodeTy, shad::ShadEdgeTy>(
           filename, galois::CUSP_CSR, galois::CUSP_CSR, true, true);
+
+  std::cout << "Test starts...\n";
 
   galois::DGAccumulator<uint64_t> sumGlobalNodes;
   galois::DGAccumulator<uint64_t> sumGlobalEdges;
@@ -55,13 +60,16 @@ int main() {
   assert(reducedSumGlobalEdges == numEdges);
   assert(reducedSumGlobalEdges == graph->globalSizeEdges());
 
+  std::cout << "Num. nodes/edges tests has been passed\n";
+
   uint32_t id = galois::runtime::getSystemNetworkInterface().ID;
   uint32_t numHosts = galois::runtime::getSystemNetworkInterface().Num;
   {
   std::ofstream fp(std::to_string(id) + ".master");
   for (uint32_t src = 0; src < graph->numMasters(); ++src) {
     uint64_t srcglobal = graph->getGID(src);
-    fp << "node " << srcglobal << ", type: " << graph->getData(src) << "\n";
+    fp << "node " << srcglobal << ", type: " << graph->getData(src).type << 
+      ", key: " << graph->getData(src).key << "\n";
     for (auto e : graph->edges(src)) {
       uint32_t dstlocal = graph->getEdgeDst(e);
       uint64_t dstglobal = graph->getGID(dstlocal);
@@ -78,11 +86,12 @@ int main() {
       std::ofstream fp(std::to_string(id) + "-" + std::to_string(host) + ".graph");
       for (uint32_t i = 0; i < graph->size(); ++i) {
         fp << i << ", " << graph->getGID(i) << ", " <<
-          graph->getData(i) << "\n";
+          graph->getData(i).type << ", " << graph->getData(i).key << "\n";
       }
       fp.close();
     }
   }
+#if 0
   {
   for (uint32_t host = 0; host < numHosts; ++host) {
     if (host == id) {
@@ -113,6 +122,7 @@ int main() {
     fp.close();
     }
   }
+#endif
 
   return 0;
 }

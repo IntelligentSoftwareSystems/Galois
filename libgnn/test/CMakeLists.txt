@@ -2,6 +2,7 @@ find_package(OpenMP)
 
 add_executable(mkl_micro mkl_micro.cpp)
 target_link_directories(mkl_micro PUBLIC ${MKL_LIBRARIES})
+target_link_directories(mkl_micro PUBLIC ${INTEL_COMPILER_LIBRARIES})
 target_include_directories(mkl_micro PUBLIC
   ${MKL_INCLUDE_DIRS}
 )
@@ -9,6 +10,7 @@ target_link_libraries(mkl_micro ${INTEL_LIBS})
 
 add_executable(mkl_micro_omp mkl_micro.cpp)
 target_link_directories(mkl_micro_omp PUBLIC ${MKL_LIBRARIES})
+target_link_directories(mkl_micro_omp PUBLIC ${INTEL_COMPILER_LIBRARIES})
 target_include_directories(mkl_micro_omp PUBLIC
   ${MKL_INCLUDE_DIRS}
 )

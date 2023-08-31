@@ -32,7 +32,7 @@ size_t galois::DistributedMinibatchTracker::GetNumberForNextMinibatch() {
     if (host == 0) {
       start = 0;
       end   = std::min(num_per_unit * sampled_num_on_hosts_[host],
-                     (uint32_t)total_minibatch_size_);
+                       (uint32_t)total_minibatch_size_);
     } else if (host == (num_hosts_ - 1)) {
       start = std::min(num_per_unit * sampled_num_on_hosts_[host - 1],
                        (uint32_t)total_minibatch_size_);
@@ -41,7 +41,7 @@ size_t galois::DistributedMinibatchTracker::GetNumberForNextMinibatch() {
       start = std::min(num_per_unit * sampled_num_on_hosts_[host - 1],
                        (uint32_t)total_minibatch_size_);
       end   = std::min(num_per_unit * sampled_num_on_hosts_[host],
-                     (uint32_t)total_minibatch_size_);
+                       (uint32_t)total_minibatch_size_);
     }
 
     uint32_t proposed_to_take = end - start;

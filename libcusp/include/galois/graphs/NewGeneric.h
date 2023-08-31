@@ -223,8 +223,8 @@ public:
    */
   NewDistGraphGeneric(
       const std::string& filename, unsigned host, unsigned _numHosts,
-      bool useShad = false, bool cuspAsync = true, uint32_t stateRounds = 100,
-      bool transpose = false,
+      bool useWMD = false, bool cuspAsync = true, uint32_t stateRounds = 100,
+      bool transpose                          = false,
       galois::graphs::MASTERS_DISTRIBUTION md = BALANCED_EDGES_OF_MASTERS,
       uint32_t nodeWeight = 0, uint32_t edgeWeight = 0,
       std::string masterBlockFile = "", bool readFromFile = false,
@@ -246,24 +246,36 @@ public:
 
     galois::graphs::OfflineGraph* offlineGraph{nullptr};
 
-    shad::ShadGraphConverter<EdgeTy> shadConverter;
+    std::string host_prefix =
+        std::string("[") +
+        std::to_string(galois::runtime::getSystemNetworkInterface().ID) +
+        std::string("] ");
+
+    shad::ShadGraphConverter shadConverter;
     galois::graphs::BufferedGraph<EdgeTy> bufGraph;
     bufGraph.resetReadCounters();
 
     std::vector<unsigned> dummy;
     // not actually getting masters, but getting assigned readers for nodes
     if (masterBlockFile == "") {
-      if (useShad) {
-        std::cout << "Construct a distributed graph from SHAD WMD format.\n";
+      if (useWMD) {
         uint64_t numGlobalNodes{0}, numGlobalEdges{0};
+        galois::gInfo(host_prefix, "Starts reading SHAD graph file");
         // Read and load the whole SHAD WMD dataset to memory.
         // TODO(hc): Note that this reads the entire graph.
         //           We will improve this to read partial graphs
         //           on each host later. For now, the main focus is
         //           to enable WMD dataset for the workflows.
         shadConverter.readSHADFile(filename, &numGlobalNodes, &numGlobalEdges);
+        galois::gInfo(host_prefix, "Completes reading SHAD graph file");
         base_DistGraph::numGlobalNodes = numGlobalNodes;
         base_DistGraph::numGlobalEdges = numGlobalEdges;
+
+        galois::gInfo(host_prefix,
+                      "Read graph # nodes:", std::to_string(numGlobalNodes),
+                      " # edges:", std::to_string(numGlobalEdges));
+        galois::gInfo(host_prefix, "Starts node array construction from SHAD"
+                                   " graph");
         // Construct node data/outgoing index range arrays
         // for a GLOBAL array, not a local array.
         // Later, parts for the local graph partition will be
@@ -281,24 +293,23 @@ public:
         // local nodes.
         // TODO(hc): UT will improve and redesign this part to
         // get scalability.
-        shadConverter.constructNodeArrays(
-            0, numGlobalNodes, numGlobalNodes);
-
+        shadConverter.constructNodeArrays(0, numGlobalNodes, numGlobalNodes);
+        galois::gInfo(host_prefix, "Completes node array construction from SHAD"
+                                   " graph");
         // Compute master proxies by using the number of global nodes
         // and edges.
         base_DistGraph::computeMasters(
-            md, base_DistGraph::numGlobalNodes,
-            base_DistGraph::numGlobalEdges,
-            shadConverter.getOutIndexBuffer(), dummy, nodeWeight,
-            edgeWeight);
+            md, base_DistGraph::numGlobalNodes, base_DistGraph::numGlobalEdges,
+            shadConverter.getOutIndexBuffer(), dummy, nodeWeight, edgeWeight);
       } else {
         offlineGraph = new galois::graphs::OfflineGraph(filename);
         base_DistGraph::numGlobalNodes = offlineGraph->size();
         base_DistGraph::numGlobalEdges = offlineGraph->sizeEdges();
-        base_DistGraph::computeMasters(md, *offlineGraph, dummy, nodeWeight, edgeWeight);
+        base_DistGraph::computeMasters(md, *offlineGraph, dummy, nodeWeight,
+                                       edgeWeight);
       }
     } else {
-      if (useShad) {
+      if (useWMD) {
         GALOIS_DIE("SHAD graph format does not support master block file");
       }
       galois::gInfo("Getting reader assignment from file");
@@ -317,11 +328,13 @@ public:
     if (!trainPoints.empty()) {
       std::vector<unsigned> testDistribution =
           galois::graphs::determineUnitRangesFromPrefixSum(
-              base_DistGraph::numHosts, *offlineGraph, trainPoints[0], trainPoints[1]);
+              base_DistGraph::numHosts, *offlineGraph, trainPoints[0],
+              trainPoints[1]);
 
       std::vector<unsigned> restDistribution =
           galois::graphs::determineUnitRangesFromPrefixSum(
-              base_DistGraph::numHosts, *offlineGraph, trainPoints[1], offlineGraph->size());
+              base_DistGraph::numHosts, *offlineGraph, trainPoints[1],
+              offlineGraph->size());
 
       // create global distribution of edges
       std::vector<uint32_t> mappings(offlineGraph->size());
@@ -371,9 +384,9 @@ public:
     graphReadTimer.start();
 
     uint64_t nodeBegin = base_DistGraph::gid2host[base_DistGraph::id].first;
-    uint64_t nodeEnd = base_DistGraph::gid2host[base_DistGraph::id].second;
+    uint64_t nodeEnd   = base_DistGraph::gid2host[base_DistGraph::id].second;
 
-    if (!useShad) {
+    if (!useWMD) {
       // If the input graph is not SHAD WMD format,
       // construct a buffered graph from the file directly, as ordinary.
       typename galois::graphs::OfflineGraph::edge_iterator edgeBegin =
@@ -384,40 +397,8 @@ public:
                                 *edgeEnd, base_DistGraph::numGlobalNodes,
                                 base_DistGraph::numGlobalEdges);
     } else {
-      // Now construct arrays for in-memory CSR.
-      // In case of the node out-going edge range array and
-      // the node data array, it will extract parts corresponding to 
-      // local graph paritition from the arrays holding the global
-      // array information.
-      // Edge destination and data arrays are constructed based on
-      // unrefined maps constructed from SHAD graph reading.
-      // NOTE that those arrays all store GLOBAL node ids.
-      // For example, edge destination array's size is equal
-      // to the number of local edges, but its destination ID is
-      // global node IDs, not local node IDs.
-      uint32_t numLocalNodes = nodeEnd - nodeBegin;
-      // So, this holds outgoing edge array of a whole (global) graph.
-      uint64_t *outIndexBuffer = shadConverter.getOutIndexBuffer();
-      // Global edge id range assigned to the current host.
-      uint64_t edgeBegin =
-          (nodeBegin == 0)? 0 : outIndexBuffer[nodeBegin - 1];
-      // This is the last local node's edge range end.
-      // So, [edgeBegin, edgeEnd) is for this current host.
-      uint64_t edgeEnd = outIndexBuffer[nodeEnd - 1];
-      // Extract node out-going range and data arrays of local nodes.
-      // From now on, those arrays store local node information
-      // as a dense memory representation.
-      shadConverter.extractLocalOutIndexArray(
-          nodeBegin, nodeEnd);
-
-      uint64_t numLocalEdges = edgeEnd - edgeBegin;
-      shadConverter.constructEdgeArrays(
-          nodeBegin, edgeBegin, numLocalNodes, numLocalEdges);
-      // Construct a buffered graph that is used by CuSP to partition
-      // a graph.
-      shadConverter.constructBufferedGraph(
-          base_DistGraph::numGlobalNodes, base_DistGraph::numGlobalEdges,
-          nodeBegin, nodeEnd, edgeBegin, edgeEnd, &bufGraph);
+      constructCSRFromSHADGraph(
+          &bufGraph, &shadConverter, nodeBegin, nodeEnd, host_prefix);
     }
 
     graphReadTimer.stop();
@@ -547,9 +528,9 @@ public:
     Tgraph_construct.stop();
     galois::gDebug("[", base_DistGraph::id, "] Graph construction complete.");
 
-    if (useShad) {
+    if (useWMD) {
       // Different from the gr format file that has been used by Galois
-      // and does not contain node data in the file, 
+      // and does not contain node data in the file,
       // a SHAD graph file has a single type for each node, and it
       // is considered as node data.
       // This function constructs and sets node data (type).
@@ -604,11 +585,79 @@ private:
     return toReturn;
   }
 
+  /// Construct arrays for in-memory CSR.
+  /// In case of the node out-going edge range array and
+  /// the node data array, it will extract parts corresponding to
+  /// local graph paritition from the arrays holding the global
+  /// array information.
+  /// Edge destination and data arrays are constructed based on
+  /// unordered maps constructed from SHAD graph reading.
+  /// NOTE that those arrays for CSR all store GLOBAL node ids.
+  /// For example, edge destination array's size is equal
+  /// to the number of local edges, but its destination ID is
+  /// global node IDs, not local node IDs.
+  ///
+  /// @tparam T Graph node data type
+  ///
+  /// @param bufGraph Buffered graph to construct
+  /// @param shadConverter Shad graph ingestor which ingested
+  /// a SHAD graph in memory to an unordered node/edge map
+  /// @param nodeBegin Global id of the first local node range
+  /// @param nodeEnd Global id of the last local node range
+  /// @param host_prefix Log prefix string for this host
+  template <
+      typename T                                                      = NodeTy,
+      typename std::enable_if_t<std::is_same_v<T, shad::ShadNodeTy>>* = nullptr>
+  void constructCSRFromSHADGraph(
+      galois::graphs::BufferedGraph<EdgeTy>* bufGraph,
+      shad::ShadGraphConverter* shadConverter,
+      uint64_t nodeBegin, uint64_t nodeEnd, std::string host_prefix) {
+    uint32_t numLocalNodes = nodeEnd - nodeBegin;
+    // So, this holds outgoing edge array of a whole (global) graph.
+    uint64_t* outIndexBuffer = shadConverter->getOutIndexBuffer();
+    // Global edge id range assigned to the current host.
+    uint64_t edgeBegin = (nodeBegin == 0) ? 0 : outIndexBuffer[nodeBegin - 1];
+    // This is the last local node's edge range end.
+    // So, [edgeBegin, edgeEnd) is for this current host.
+    uint64_t edgeEnd = outIndexBuffer[nodeEnd - 1];
+    galois::gInfo(host_prefix, "Starts local out index array construction");
+    // Extract node out-going range and data arrays of local nodes.
+    // From now on, those arrays store local node information
+    // as a dense memory representation.
+    shadConverter->extractLocalOutIndexArray(nodeBegin, nodeEnd);
+    galois::gInfo(host_prefix,
+                  "Completes local out index array construction");
+
+    galois::gInfo(host_prefix, "Starts edge destination/data "
+                               "array construction");
+    uint64_t numLocalEdges = edgeEnd - edgeBegin;
+    shadConverter->constructEdgeArrays(nodeBegin, edgeBegin, numLocalNodes,
+                                      numLocalEdges);
+
+    galois::gInfo(host_prefix, "Completes edge destination/data "
+                               "array construction");
+    // Construct a buffered graph that is used by CuSP to partition
+    // a graph.
+    shadConverter->constructBufferedGraph(
+        base_DistGraph::numGlobalNodes, base_DistGraph::numGlobalEdges,
+        nodeBegin, nodeEnd, edgeBegin, edgeEnd, bufGraph);
+    galois::gInfo(host_prefix, "Completes buffered graph construction from"
+                               " SHAD graph");
+  }
+
+  // Disable this method for non-SHAD graph construction.
+  template <
+      typename T                                                      = NodeTy,
+      typename std::enable_if_t<!std::is_same_v<T, shad::ShadNodeTy>>* = nullptr>
+  void constructCSRFromSHADGraph(
+      galois::graphs::BufferedGraph<EdgeTy>*,
+      shad::ShadGraphConverter*, uint64_t, uint64_t, std::string) {}
+
   /**
    * @brief Assign a SHAD node type to a node data.
    *
    * @detail Different from the gr format file that has been used by Galois
-   * and does not contain node data in the file, 
+   * and does not contain node data in the file,
    * a SHAD graph file has a single type for each node, and it
    * considered as node data. This function constructs and sets node
    * data based on that.
@@ -620,26 +669,23 @@ private:
    * @param shadConverter SHAD graph converter holding node data from a
    * SHAD file.
    */
-  template <typename T = NodeTy,
-            typename std::enable_if_t<
-                std::is_same_v<T, uint64_t>>* = nullptr>
-  void assignNodeDataFromSHADProp(shad::ShadGraphConverter<EdgeTy>* shadConverter) {
+  template <
+      typename T                                                      = NodeTy,
+      typename std::enable_if_t<std::is_same_v<T, shad::ShadNodeTy>>* = nullptr>
+  void assignNodeDataFromSHADProp(shad::ShadGraphConverter* shadConverter) {
     galois::gPrint("[", base_DistGraph::id, "] Graph node data is assigned.");
-    uint64_t* nodeDataBuffer = shadConverter->getNodeDataBuffer();
+    shad::ShadNodeTy* nodeDataBuffer = shadConverter->getNodeDataBuffer();
     galois::do_all(galois::iterate(base_DistGraph::allNodesRange()),
-        [&](uint32_t lid) {
-          uint64_t gid = this->getGID(lid);
-          this->getData(lid) = nodeDataBuffer[gid];
-          std::cout << "lid :" << lid << " is set to " <<
-          this->getData(lid) << "\n";
-        });
+                   [&](uint32_t lid) {
+                     uint64_t gid       = this->getGID(lid);
+                     this->getData(lid) = nodeDataBuffer[gid];
+                   });
   }
 
   template <typename T = NodeTy,
-            typename std::enable_if_t<
-                !std::is_same_v<T, uint64_t>>* = nullptr>
-  void assignNodeDataFromSHADProp(
-      [[maybe_unused]] shad::ShadGraphConverter<EdgeTy>* shadConverter) {}
+            typename std::enable_if_t<!std::is_same_v<T, shad::ShadNodeTy>>* =
+                nullptr>
+  void assignNodeDataFromSHADProp(shad::ShadGraphConverter*) {}
 
   /**
    * For each other host, determine which nodes that this host needs to get

@@ -117,6 +117,33 @@ void GNNBenchStart(int argc, char** argv, const char* app, const char* desc,
     galois::runtime::reportParam("GNNBench", "IsGraphSampled",
                                  do_graph_sampling);
     galois::runtime::reportParam("GNNBench", "LearningRate", learning_rate);
+
+    if (useWMD &&
+        partition_scheme != galois::graphs::GNNPartitionScheme::kOCVC) {
+      // cvc/oec (GNN-CVC, GNN-OEC in CuSP), not ocvc, are variants
+      // of the default CuSP cvc/oec partitioning policies.
+      // The original partitioning policies (including ocvc) only
+      // consider and attempt to balance the number of master nodes
+      // for each host.
+      // However, Galois-GNN chooses training vertices from the original graph,
+      // and extracts, constructs, uses a subgraph only with them for training.
+      // In this case, especially Galois-GNN typically chooses a consecutive
+      // range of vertices as the training vertices.
+      // This method might cause load imbalancing among hosts since most of the
+      // training master nodes are skewed to the few hosts.
+      // In order to alleviate this issue, Galois-GNN provides those variant
+      // partitioning policies. They consider and attempt to balance the
+      // number of master "training" nodes for each host.
+      // SHAD-GNN on WMD graphs is not necessarily constrained to this design.
+      // SHAD-GNN has the specific number of training vertices, and randomly 
+      // selects vertices from a graph as that, which means that Galois-GNN
+      // could avoid vertex imbalancing due to the skewness if it chooses
+      // vertices in balance manner.
+      // To sum up, we do not support the specialized partitioning policies,
+      // but choose vertices in balance manner.
+      GALOIS_LOG_FATAL("Gnn CVC and OEC are not supported for WMD graphs {}",
+          GNNPartitionToString(partition_scheme));
+    }
   }
 
   char name[256];

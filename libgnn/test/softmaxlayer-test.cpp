@@ -17,8 +17,8 @@ int main() {
   GALOIS_LOG_VERBOSE("Num threads is {}", num_threads);
 
   // load test graph
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   // input/output columns must be same in softmax
   galois::GNNLayerDimensions dimension_0;
@@ -43,7 +43,7 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
   // train mode
-  auto output_layer = std::make_unique<galois::SoftmaxLayer>(
+  auto output_layer = std::make_unique<galois::SoftmaxLayer<char, void>>(
       3, test_graph, &p_back, dimension_0);
   galois::PointerWithSize<galois::GNNFloat> prediction_distribution =
       output_layer->ForwardPhase(softmax_input);

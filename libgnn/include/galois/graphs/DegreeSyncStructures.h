@@ -10,17 +10,19 @@ extern uint32_t* gnn_degree_vec_2_;
 extern galois::DynamicBitSet bitset_sampled_degrees_;
 extern std::vector<galois::LargeArray<uint32_t>>* gnn_sampled_out_degrees_;
 
+template <typename NTy>
 struct InitialDegreeSync {
-  using ValTy = std::pair<uint32_t, uint32_t>;
+  using NodeTy = NTy;
+  using ValTy  = std::pair<uint32_t, uint32_t>;
 
   //! return a vector of floats to sync
-  static ValTy extract(uint32_t lid, char&) {
+  static ValTy extract(uint32_t lid, NodeTy&) {
     return std::make_pair(gnn_degree_vec_1_[lid], gnn_degree_vec_2_[lid]);
   }
 
   //! reduction is addition in this case; add received vector to
   //! own vector
-  static bool reduce(uint32_t lid, char&, ValTy y) {
+  static bool reduce(uint32_t lid, NodeTy&, ValTy y) {
     gnn_degree_vec_1_[lid] += y.first;
     gnn_degree_vec_2_[lid] += y.second;
     if (y.first || y.second) {
@@ -31,13 +33,13 @@ struct InitialDegreeSync {
   }
 
   //! No-op: readAny = overwritten anyways
-  static void reset(uint32_t lid, char&) {
+  static void reset(uint32_t lid, NodeTy&) {
     gnn_degree_vec_1_[lid] = 0;
     gnn_degree_vec_2_[lid] = 0;
   }
 
   //! element wise set
-  static void setVal(uint32_t lid, char&, ValTy y) {
+  static void setVal(uint32_t lid, NodeTy&, ValTy y) {
     gnn_degree_vec_1_[lid] = y.first;
     gnn_degree_vec_2_[lid] = y.second;
   }
@@ -58,12 +60,14 @@ struct InitialDegreeSync {
   static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
 };
 
+template <typename NTy>
 struct SubgraphDegreeSync {
-  using ValTy = galois::gstl::Vector<uint32_t>;
+  using NodeTy = NTy;
+  using ValTy  = galois::gstl::Vector<uint32_t>;
 
   static size_t FeatVecSize() { return gnn_sampled_out_degrees_->size(); }
 
-  static ValTy extract(uint32_t lid, char&) {
+  static ValTy extract(uint32_t lid, NodeTy&) {
     ValTy vec_to_send(gnn_sampled_out_degrees_->size());
     size_t count = 0;
     for (galois::LargeArray<uint32_t>& layer_degrees :
@@ -85,7 +89,7 @@ struct SubgraphDegreeSync {
     }
   }
 
-  static bool reduce(uint32_t lid, char&, ValTy y) {
+  static bool reduce(uint32_t lid, NodeTy&, ValTy y) {
     assert(y.size() == gnn_sampled_out_degrees_->size());
     for (size_t degree_index = 0; degree_index < y.size(); degree_index++) {
       (*gnn_sampled_out_degrees_)[degree_index][lid] += y[degree_index];
@@ -93,7 +97,7 @@ struct SubgraphDegreeSync {
     return true;
   }
 
-  static bool reduce(uint32_t lid, char&, ValTy::value_type* y) {
+  static bool reduce(uint32_t lid, NodeTy&, ValTy::value_type* y) {
     for (size_t degree_index = 0;
          degree_index < gnn_sampled_out_degrees_->size(); degree_index++) {
       (*gnn_sampled_out_degrees_)[degree_index][lid] += y[degree_index];
@@ -102,7 +106,7 @@ struct SubgraphDegreeSync {
   }
 
   //! No-op: readAny = overwritten anyways; can probably get away with no-op
-  static void reset(uint32_t lid, char&) {
+  static void reset(uint32_t lid, NodeTy&) {
     for (galois::LargeArray<uint32_t>& layer_degrees :
          *gnn_sampled_out_degrees_) {
       layer_degrees[lid] = 0;
@@ -110,14 +114,14 @@ struct SubgraphDegreeSync {
   }
 
   //! element wise set
-  static void setVal(uint32_t lid, char&, ValTy y) {
+  static void setVal(uint32_t lid, NodeTy&, ValTy y) {
     assert(y.size() == gnn_sampled_out_degrees_->size());
     for (size_t degree_index = 0; degree_index < y.size(); degree_index++) {
       (*gnn_sampled_out_degrees_)[degree_index][lid] = y[degree_index];
     }
   }
 
-  static void setVal(uint32_t lid, char&, ValTy::value_type* y) {
+  static void setVal(uint32_t lid, NodeTy&, ValTy::value_type* y) {
     for (size_t degree_index = 0;
          degree_index < gnn_sampled_out_degrees_->size(); degree_index++) {
       (*gnn_sampled_out_degrees_)[degree_index][lid] = y[degree_index];

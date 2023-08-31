@@ -1985,14 +1985,16 @@ public:
 #define GALOIS_SYNC_STRUCTURE_GNN_LAYER(fieldname, cuda_ctx_for_sync,          \
                                         gnn_matrix_to_sync_column_length_,     \
                                         layer_number_to_sync)                  \
+  template <typename NTy>                                                      \
   struct GNNSumAggregate_##fieldname {                                         \
+    using NodeTy = NTy;                                                        \
     using ValTy = GNNFloat;                                                    \
                                                                                \
-    static ValTy extract(uint32_t, char&) { return 0.f; }                      \
+    static ValTy extract(uint32_t, NodeTy&) { return 0.f; }                    \
                                                                                \
-    static bool reduce(uint32_t, char&, ValTy) { return false; }               \
+    static bool reduce(uint32_t, NodeTy&, ValTy) { return false; }             \
                                                                                \
-    static void reset(uint32_t, char&) {}                                      \
+    static void reset(uint32_t, NodeTy&) {}                                    \
                                                                                \
     static void setVal(uint32_t, char&, ValTy) {}                              \
                                                                                \

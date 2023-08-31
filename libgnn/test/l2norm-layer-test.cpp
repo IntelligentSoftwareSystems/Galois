@@ -10,8 +10,8 @@ int main() {
   GALOIS_LOG_VERBOSE("Num threads is {}", num_threads);
 
   // load test graph
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   // input/output columns must be same in softmax
   galois::GNNLayerDimensions dimension_0;
@@ -38,7 +38,7 @@ int main() {
   std::vector<galois::GNNFloat> back_matrix(14);
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
-  auto l2_layer = std::make_unique<galois::L2NormLayer>(2, test_graph, &p_back,
+  auto l2_layer = std::make_unique<galois::L2NormLayer<char, void>>(2, test_graph, &p_back,
                                                         dimension_0);
   galois::PointerWithSize<galois::GNNFloat> normed =
       l2_layer->ForwardPhase(l2_input);

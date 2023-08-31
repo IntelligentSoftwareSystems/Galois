@@ -50,7 +50,7 @@ using DistGraphPtr =
  * to the partitioner
  * @param outputType Specifies the output format (CSR or CSC) that each
  * partition will be created in
- * @param useShad "true" if the passed graph file format is a SHAD WMD graph
+ * @param useWMD "true" if the passed graph file format is a WMD graph
  * @param symmetricGraph This should be "true" if the passed in graphFile
  * is a symmetric graph
  * @param transposeGraphFile Transpose graph of graphFile in Galois binary
@@ -84,8 +84,8 @@ template <typename PartitionPolicy, typename NodeData = char,
           typename EdgeData = void>
 DistGraphPtr<NodeData, EdgeData>
 cuspPartitionGraph(std::string graphFile, CUSP_GRAPH_TYPE inputType,
-                   CUSP_GRAPH_TYPE outputType, bool useShad = false,
-                   bool symmetricGraph = false,
+                   CUSP_GRAPH_TYPE outputType, bool useWMD = false,
+                   bool symmetricGraph            = false,
                    std::string transposeGraphFile = "",
                    std::string masterBlockFile = "", bool cuspAsync = true,
                    uint32_t cuspStateRounds = 100,
@@ -128,13 +128,13 @@ cuspPartitionGraph(std::string graphFile, CUSP_GRAPH_TYPE inputType,
     }
 
     return std::make_unique<DistGraphConstructor>(
-        inputToUse, net.ID, net.Num, useShad, cuspAsync, cuspStateRounds, useTranspose,
-        readPolicy, nodeWeight, edgeWeight, masterBlockFile);
+        inputToUse, net.ID, net.Num, useWMD, cuspAsync, cuspStateRounds,
+        useTranspose, readPolicy, nodeWeight, edgeWeight, masterBlockFile);
   } else {
     // symmetric graph path: assume the passed in graphFile is a symmetric
     // graph; output is also symmetric
     return std::make_unique<DistGraphConstructor>(
-        graphFile, net.ID, net.Num, useShad, cuspAsync, cuspStateRounds, false,
+        graphFile, net.ID, net.Num, useWMD, cuspAsync, cuspStateRounds, false,
         readPolicy, nodeWeight, edgeWeight, masterBlockFile);
   }
 }

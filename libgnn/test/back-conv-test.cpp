@@ -11,8 +11,8 @@ int main() {
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
   // load test graph
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kCVC, true);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kCVC, true, false);
   galois::PointerWithSize<galois::GNNFloat> feats =
       test_graph.GetLocalFeatures();
   for (size_t row = 0; row < test_graph.size(); row++) {
@@ -70,8 +70,8 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
   // create layer 1 for testing backward prop actually giving weights back
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph, &p_back,
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_1 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(1, test_graph, &p_back,
                                                         dimension_0, dcon);
   layer_1->InitAllWeightsTo1();
   galois::PointerWithSize<galois::GNNFloat> layer_1_forward_output =

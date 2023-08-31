@@ -13,8 +13,8 @@ int main() {
   GALOIS_LOG_VERBOSE("Num threads is {}", num_threads);
 
   // load graph
-  auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "cora", galois::graphs::GNNPartitionScheme::kCVC, true);
+  auto test_graph = std::make_unique<galois::graphs::GNNGraph<char, void>>(
+      "cora", galois::graphs::GNNPartitionScheme::kCVC, true, false);
 
   std::vector<galois::GNNLayerType> layer_types = {
       galois::GNNLayerType::kGraphConvolutional,
@@ -34,7 +34,7 @@ int main() {
                                     16 * test_graph->GetNumLabelClasses()};
   auto adam = std::make_unique<galois::AdamOptimizer>(adam_sizes, 2);
 
-  auto gnn = std::make_unique<galois::GraphNeuralNetwork>(
+  auto gnn = std::make_unique<galois::GraphNeuralNetwork<char, void>>(
       std::move(test_graph), std::move(adam), std::move(gnn_config));
 
   //////////////////////////////////////////////////////////////////////////////

@@ -16,8 +16,8 @@ int main() {
   gpudevice          = galois::runtime::getSystemNetworkInterface().ID;
   SetCUDADeviceId(gpudevice);
 
-  auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  auto test_graph = std::make_unique<galois::graphs::GNNGraph<char, void>>(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   // create same layer from convlayer-test and make sure result is the same even
   // in multi-host environment
@@ -42,8 +42,8 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
   // create the layer, no norm factor
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
-      std::make_unique<galois::GraphConvolutionalLayer>(
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_0 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(
           0, *(test_graph.get()), &p_null, dimension_0, l_config);
   layer_0->InitAllWeightsTo1();
   // make sure it runs in a sane manner
@@ -130,8 +130,8 @@ int main() {
   //////////////////////////////////////////////////////////////////////////////
   // layer 1 to check backward output
   //////////////////////////////////////////////////////////////////////////////
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_1 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(
           1, *(test_graph.get()), &p_back, dimension_0, l_config);
   layer_1->InitAllWeightsTo1();
   layer_1->ForwardPhase(test_graph->GetLocalFeatures());

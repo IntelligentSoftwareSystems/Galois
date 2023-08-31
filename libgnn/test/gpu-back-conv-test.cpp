@@ -20,8 +20,8 @@ int main() {
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
   // load test graph
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kCVC, true);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kCVC, true, false);
 
   galois::GNNLayerDimensions dimension_0;
   dimension_0.input_rows     = test_graph.size();
@@ -53,8 +53,8 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> output_layer(output_matrix);
 
   // create layer 1 for testing backward prop actually giving weights back
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph, &p_back,
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_1 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(1, test_graph, &p_back,
                                                         dimension_0, dcon);
   galois::PointerWithSize dummy_ones = layer_1->AllocateGPU(dummy_ones_v);
   layer_1->InitAllWeightsTo1();

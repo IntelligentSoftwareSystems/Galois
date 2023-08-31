@@ -15,8 +15,8 @@ int main() {
                      num_threads);
   device_personality = DevicePersonality::GPU_CUDA;
   // load test graph
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   galois::PointerWithSize<galois::GNNFloat> feats =
       test_graph.GetLocalFeatures();
@@ -52,8 +52,8 @@ int main() {
       dimension_0.input_columns, dimension_0.output_columns);
 
   // create the layer, no norm factor
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
-      std::make_unique<galois::GraphConvolutionalLayer>(0, test_graph, &p_null,
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_0 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(0, test_graph, &p_null,
                                                         dimension_0, dcon);
   layer_0->InitAllWeightsTo1();
   // make sure it runs in a sane manner
@@ -112,8 +112,8 @@ int main() {
 
   // create layer 1 for testing backward prop actually giving weights back
 
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph, &p_back,
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_1 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(1, test_graph, &p_back,
                                                         dimension_0, dcon);
   layer_1->InitAllWeightsTo1();
   layer_1->ForwardPhase(test_graph.GetLocalFeatures());
@@ -194,8 +194,8 @@ int main() {
   // (verification requires floating point accuracy or setting a seed which I
   // don't have time for at the moment
   // TODO in future maybe add better unit test for this
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_2 =
-      std::make_unique<galois::GraphConvolutionalLayer>(2, test_graph, &p_back,
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_2 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(2, test_graph, &p_back,
                                                         dimension_0, config);
   layer_2->ForwardPhase(test_graph.GetLocalFeatures());
   // pointer is to GPU memory: copy it over to a CPU source for verification

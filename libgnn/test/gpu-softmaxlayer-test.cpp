@@ -14,8 +14,8 @@ int main() {
   device_personality = DevicePersonality::GPU_CUDA;
 
   // load test graph
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   // input/output columns must be same in softmax
   galois::GNNLayerDimensions dimension_0;
@@ -29,7 +29,7 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
   // train mode
-  auto output_layer = std::make_unique<galois::SoftmaxLayer>(
+  auto output_layer = std::make_unique<galois::SoftmaxLayer<char, void>>(
       3, test_graph, &p_back, dimension_0);
   // input to softmax
   std::vector<galois::GNNFloat> softmax_input(49, 0.0);

@@ -1,6 +1,7 @@
 #ifndef GALOIS_DISTBENCH_OUTPUT_H
 #define GALOIS_DISTBENCH_OUTPUT_H
 
+#include <cstdint>
 #include <string>
 #include <fstream>
 #include "galois/gIO.h"

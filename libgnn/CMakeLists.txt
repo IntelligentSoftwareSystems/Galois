@@ -2,17 +2,8 @@ set(sources
   src/DistributedMinibatchTracker.cpp
   src/GNNMath.cpp
   src/GNNOptimizers.cpp
-  src/GraphNeuralNetwork.cpp
   src/MinibatchGenerator.cpp
   src/graphs/GNNGraph.cpp
-  src/graphs/GNNSubgraph.cpp
-  src/layers/DenseLayer.cpp
-  src/layers/GNNLayer.cpp
-  src/layers/GraphConvolutionalLayer.cpp
-  src/layers/L2NormLayer.cpp
-  src/layers/SAGELayer.cpp
-  src/layers/SigmoidLayer.cpp
-  src/layers/SoftmaxLayer.cpp
 )
 
 ## TODO(hc): Note that these libraries should be hard-coded
@@ -26,8 +17,8 @@ set(SINGLE_INTEL_LIBS "-lmkl_intel_lp64 -lmkl_sequential -lmkl_core")
 add_library(galois_gnn STATIC ${sources})
 
 target_link_directories(galois_gnn PUBLIC ${MKL_LIBRARIES})
-target_link_directories(galois_gnn PUBLIC ${INTEL_COMPILER_LIBRARIES})
 target_link_libraries(galois_gnn ${INTEL_LIBS})
+target_link_directories(galois_gnn PUBLIC ${INTEL_COMPILER_LIBRARIES})
 target_link_libraries(galois_gnn galois_shmem)
 target_link_libraries(galois_gnn galois_dist_async galois_cusp galois_gluon galois_support)
 target_include_directories(galois_gnn PUBLIC

@@ -12,11 +12,16 @@
 
 namespace shad {
 
+struct ShadNodeTy {
+  int type;
+  uint64_t key;
+};
+using ShadEdgeTy = uint64_t;
+
 /**
  * TODO(hc): This is a shared-memory version.
  * Later, a distributed-memory version in libgluon will reuse this code.
  */
-template <typename EdgeDataTy>
 class ShadGraphConverter {
 
 public:
@@ -39,13 +44,14 @@ public:
     for (size_t i = 0; i < this->verticeIdKeyMapping.size(); ++i) {
       uint64_t key = this->verticeIdKeyMapping[i];
       Vertex v = this->vertices[key];
-      fp << "node " << i << ", type: " << to_underlying(v.type) << "\n";
+      fp << "node " << i << ", type: " << to_underlying(v.type) << ", key: " <<
+        key << "\n";
       auto edgeRange = this->edges.equal_range(key);
       for (auto ei = edgeRange.first ; ei != edgeRange.second; ++ei) {
         Edge& edge = ei->second;
         Vertex dst = this->vertices[edge.dst];
         fp << "\t edge dst " << dst.id << ", type: " <<
-            to_underlying(edge.type) << "\n";
+            to_underlying(edge.type) << ", key: " << dst.shadKey << "\n";
       }
     }
     fp.close();
@@ -110,7 +116,7 @@ public:
       uint64_t numGlobalNodes, uint64_t numGlobalEdges,
       uint32_t nodeBegin, uint32_t nodeEnd,
       uint64_t edgeBegin, uint64_t edgeEnd,
-      [[maybe_unused]]galois::graphs::BufferedGraph<EdgeDataTy>* bufferedGraph) {
+      [[maybe_unused]]galois::graphs::BufferedGraph<ShadEdgeTy>* bufferedGraph) {
     // TODO(hc): Each of these functions first construct graphs in the SHAD
     // format as this file is written in not binary, but string, and also 
     // nodes or edges are not sorted. So, until we preprocess the input graph
@@ -250,7 +256,7 @@ public:
    * @brief Return node data array. 
    * Note that this can be either of global graph or local graph.
    */
-  uint64_t* getNodeDataBuffer() {
+  ShadNodeTy* getNodeDataBuffer() {
     return nodeDataBuffer;
   }
 
@@ -280,7 +286,7 @@ public:
       uint32_t nodeBegin, uint32_t nodeEnd, uint32_t numLocalNodes) {
     // 1) Construct an edge index array (size == number of nodes).
     this->outIndexBuffer = new uint64_t[numLocalNodes];
-    this->nodeDataBuffer = new uint64_t[numLocalNodes];
+    this->nodeDataBuffer = new ShadNodeTy[numLocalNodes];
 
     // TODO(hc): for now, only consider a single host, but need to add offset later.
     galois::do_all(galois::iterate(this->vertices),
@@ -292,8 +298,13 @@ public:
                 vertex.getNumEdges();
             // Fill vertex data too; This assumes that a SHAD graph
             // has a type, which is considered as a vertex data.
-            this->nodeDataBuffer[vertexId - nodeBegin] =
+            this->nodeDataBuffer[vertexId - nodeBegin].type =
                 this->to_underlying(vertex.type);
+            this->nodeDataBuffer[vertexId - nodeBegin].key =
+                vertex.shadKey;
+            //std::cout << vertexId - nodeBegin << " is set to "
+            //<< this->nodeDataBuffer[vertexId - nodeBegin].type << " and " <<
+            //this->nodeDataBuffer[vertexId - nodeBegin].key << "\n";
           }
         });
     // 2) Perform parallel prefix sum to finalize outgoing edge index
@@ -320,14 +331,14 @@ public:
    * @param numLocalEdges The number of local edges
    *
    */
-  template <typename T = EdgeDataTy,
+  template <typename T = ShadEdgeTy,
             typename std::enable_if_t<!std::is_same_v<
                 T, void>>* = nullptr>
   void constructEdgeArrays(
       uint32_t nodeBegin, uint64_t edgeBegin, uint32_t numLocalNodes,
       uint64_t numLocalEdges) {
     this->edgeDestBuffer = new uint32_t[numLocalEdges];
-    this->edgeDataBuffer = new EdgeDataTy[numLocalEdges];
+    this->edgeDataBuffer = new ShadEdgeTy[numLocalEdges];
     std::vector<uint32_t> edgeIndexPointers(numLocalNodes, 0);
     galois::on_each([&](uint32_t tid, uint32_t numThreads) {
       // 1) Find disjointed node range for each thread.
@@ -375,7 +386,7 @@ public:
    * @param numLocalEdges The number of local edges
    *
    */
-  template <typename T = EdgeDataTy,
+  template <typename T = ShadEdgeTy,
             typename std::enable_if_t<std::is_same_v<
                 T, void>>* = nullptr>
   void constructEdgeArrays(
@@ -437,7 +448,7 @@ public:
    * @return True if passed information matches to the one in
    * a temporary vertex map
    */
-  bool checkNode(uint64_t id, uint64_t type) {
+  bool checkNode(uint64_t id, int type) {
     uint64_t key = this->verticeIdKeyMapping[id];
     Vertex& vertex = this->vertices[key];
     return (this->to_underlying(vertex.type) == type);
@@ -457,11 +468,8 @@ public:
    * a temporary edge map
    */
   bool checkEdge(uint64_t snid, uint64_t dnid,
-      uint64_t eid, uint64_t type) {
+      uint64_t /*eid*/, int type) {
     uint64_t skey = this->verticeIdKeyMapping[snid];
-    uint64_t dkey = this->verticeIdKeyMapping[dnid];
-
-    Vertex& vertex = this->vertices[skey];
     auto edgeRange = this->edges.equal_range(skey);
     uint64_t eidx{0};
     Edge edge;
@@ -527,7 +535,7 @@ private:
     return tokens;
   }
 
-  void CountNumEdgesForEachVertex(uint64_t numNodes, uint64_t numEdges) {
+  void CountNumEdgesForEachVertex(uint64_t numNodes, uint64_t /*numEdges*/) {
     //galois::on_each([this, numNodes, numEdges](
     galois::on_each([&](
         uint32_t tid, uint32_t numThreads) {
@@ -626,16 +634,16 @@ private:
 
   void VerifyCSRConstruction(
       [[maybe_unused]] uint64_t* outIndexBuffer,
-      [[maybe_unused]] uint64_t* nodeDataBuffer,
+      [[maybe_unused]] ShadNodeTy* nodeDataBuffer,
       [[maybe_unused]] uint32_t* edgeDestBuffer,
       [[maybe_unused]] void* edgeDataBuffer) {}
 
-  template <typename T = EdgeDataTy,
+  template <typename T = ShadEdgeTy,
             typename std::enable_if_t<std::is_same_v<
                 T, uint64_t>>* = nullptr>
   void VerifyCSRConstruction(
-      uint64_t* outIndexBuffer, [[maybe_unused]] uint64_t* nodeDataBuffer,
-      uint32_t* edgeDestBuffer, EdgeDataTy* edgeDataBuffer) {
+      uint64_t* outIndexBuffer, [[maybe_unused]] ShadNodeTy* nodeDataBuffer,
+      uint32_t* edgeDestBuffer, ShadEdgeTy* edgeDataBuffer) {
     // 1) Iterate edge index array.
     // 2) Compare each verteices' edge range with SHAD vertex 
     for (size_t i = 0; i < this->vertices.size(); ++i) {
@@ -645,7 +653,7 @@ private:
       uint64_t edgeBegin = (i == 0)? 0 : outIndexBuffer[i - 1];
       uint64_t edgeEnd = outIndexBuffer[i];
       assert(srcV.numEdges == edgeEnd - edgeBegin);
-      assert(this->to_underlying(srcV.type) == int(nodeDataBuffer[i]));
+      assert(this->to_underlying(srcV.type) == int(nodeDataBuffer[i].type));
       assert(srcV.id == i);
       galois::do_all(galois::iterate(edgeBegin, edgeEnd),
           [&](size_t j) {
@@ -701,10 +709,10 @@ private:
   // Key is global node id and value is corresponding key of that node
   std::unordered_map<uint64_t, uint64_t> verticeIdKeyMapping;
   // TODO(hc): Always assume uint64_t node data type
-  uint64_t* nodeDataBuffer;
+  ShadNodeTy* nodeDataBuffer;
   uint64_t* outIndexBuffer;
   uint32_t* edgeDestBuffer;
-  EdgeDataTy* edgeDataBuffer;
+  ShadEdgeTy* edgeDataBuffer;
 };
 
 }; // shad namespace

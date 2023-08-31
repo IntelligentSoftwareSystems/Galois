@@ -9,8 +9,8 @@ int main() {
     GALOIS_LOG_WARN("This test should be run with multiple hosts/processes!");
   }
 
-  auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  auto test_graph = std::make_unique<galois::graphs::GNNGraph<char, void>>(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   // print edges for sanity
   for (size_t node = 0; node < test_graph->size(); node++) {
@@ -42,8 +42,8 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
   // create the layer, no norm factor
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
-      std::make_unique<galois::GraphConvolutionalLayer>(
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_0 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(
           0, *(test_graph.get()), &p_null, dimension_0, l_config);
   layer_0->InitAllWeightsTo1();
   // make sure it runs in a sane manner
@@ -125,8 +125,8 @@ int main() {
   //////////////////////////////////////////////////////////////////////////////
   // layer 1 to check backward output
   //////////////////////////////////////////////////////////////////////////////
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_1 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(
           1, *(test_graph.get()), &p_back, dimension_0, l_config);
   layer_1->InitAllWeightsTo1();
   galois::PointerWithSize<galois::GNNFloat> layer_1_forward_output =
@@ -206,8 +206,8 @@ int main() {
     }
   }
   //////////////////////////////////////////////////////////////////////////////
-  auto test_graph_2 = std::make_unique<galois::graphs::GNNGraph>(
-      "tester", galois::graphs::GNNPartitionScheme::kCVC, true);
+  auto test_graph_2 = std::make_unique<galois::graphs::GNNGraph<char, void>>(
+      "tester", galois::graphs::GNNPartitionScheme::kCVC, true, false);
   // print edges for sanity
   for (size_t node = 0; node < test_graph_2->size(); node++) {
     for (auto e = test_graph_2->edge_begin(node);
@@ -232,7 +232,7 @@ int main() {
   l_config.DebugConfig();
 
   // create the layer, no norm factor
-  layer_0 = std::make_unique<galois::GraphConvolutionalLayer>(
+  layer_0 = std::make_unique<galois::GraphConvolutionalLayer<char, void>>(
       0, *(test_graph_2.get()), &p_null, dimension_0, l_config);
   layer_0->InitAllWeightsTo1();
 
@@ -300,7 +300,7 @@ int main() {
   std::vector<galois::GNNFloat> back_matrix_2(test_graph_2->size() * 3);
   galois::PointerWithSize<galois::GNNFloat> p_back_2(back_matrix_2);
 
-  layer_1 = std::make_unique<galois::GraphConvolutionalLayer>(
+  layer_1 = std::make_unique<galois::GraphConvolutionalLayer<char, void>>(
       1, *(test_graph_2.get()), &p_back_2, dimension_0, l_config);
   layer_1->InitAllWeightsTo1();
   layer_1_forward_output =

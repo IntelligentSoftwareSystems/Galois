@@ -14,8 +14,8 @@ int main() {
   device_personality = DevicePersonality::GPU_CUDA;
 
   // load graph
-  auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "cora", galois::graphs::GNNPartitionScheme::kCVC, true);
+  auto test_graph = std::make_unique<galois::graphs::GNNGraph<char, void>>(
+      "cora", galois::graphs::GNNPartitionScheme::kCVC, true, false);
 
   std::vector<galois::GNNLayerType> layer_types = {
       galois::GNNLayerType::kGraphConvolutional,
@@ -36,7 +36,7 @@ int main() {
   std::vector<galois::GNNFloat> cpu_pred;
   cpu_pred.resize(test_graph->GetNumLabelClasses() * test_graph->size());
 
-  auto gnn = std::make_unique<galois::GraphNeuralNetwork>(
+  auto gnn = std::make_unique<galois::GraphNeuralNetwork<char, void>>(
       std::move(test_graph), std::move(adam), std::move(gnn_config));
 
   //////////////////////////////////////////////////////////////////////////////

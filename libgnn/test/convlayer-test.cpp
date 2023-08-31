@@ -14,8 +14,8 @@ int main() {
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
   // load test graph
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   galois::PointerWithSize<galois::GNNFloat> feats =
       test_graph.GetLocalFeatures();
@@ -60,8 +60,8 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
   // create the layer, no norm factor
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_0 =
-      std::make_unique<galois::GraphConvolutionalLayer>(0, test_graph, &p_null,
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_0 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(0, test_graph, &p_null,
                                                         dimension_0, dcon);
   layer_0->InitAllWeightsTo1();
   // make sure it runs in a sane manner
@@ -125,8 +125,8 @@ int main() {
 
   // create layer 1 for testing backward prop actually giving weights back
 
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph, &p_back,
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_1 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(1, test_graph, &p_back,
                                                         dimension_0, dcon);
   layer_1->InitAllWeightsTo1();
   galois::PointerWithSize<galois::GNNFloat> layer_1_forward_output =
@@ -202,8 +202,8 @@ int main() {
   // (verification requires floating point accuracy or setting a seed which I
   // don't have time for at the moment
   // TODO in future maybe add better unit test for this
-  std::unique_ptr<galois::GraphConvolutionalLayer> layer_2 =
-      std::make_unique<galois::GraphConvolutionalLayer>(1, test_graph, &p_back,
+  std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_2 =
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(1, test_graph, &p_back,
                                                         dimension_0, config);
   galois::PointerWithSize<galois::GNNFloat> l2_fo =
       layer_2->ForwardPhase(test_graph.GetLocalFeatures());

@@ -26,8 +26,8 @@ int main() {
 
   // make this layer to get access to a gpu helper function; TODO
   // need a helper alloc function
-  galois::graphs::GNNGraph test_graph(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  galois::graphs::GNNGraph<char, void> test_graph(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
   galois::GNNLayerDimensions dimension_0;
   dimension_0.input_rows     = 7;
   dimension_0.input_columns  = test_graph.GetNumLabelClasses();

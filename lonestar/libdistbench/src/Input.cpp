@@ -60,9 +60,9 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
                    "fennel, incoming edge cut, using CuSP")),
     cll::init(OEC));
 
-cll::opt<bool> useShad("useShad", cll::desc("true if the input graph is"
-                                            " SHAD WMD graph format."
-                                            " Otheriwse, set false."),
+cll::opt<bool> useWMD("useWMD", cll::desc("true if the input graph is"
+                                          " SHAD WMD graph format."
+                                          " Otheriwse, set false."),
                        cll::init(false));
 
 cll::opt<bool> readFromFile("readFromFile",

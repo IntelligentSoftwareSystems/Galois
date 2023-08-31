@@ -8,8 +8,9 @@ int main(int argc, char* argv[]) {
 
   galois::StatTimer init_timer("InitializationTime");
   init_timer.start();
-  std::unique_ptr<galois::GraphNeuralNetwork> gnn =
-      InitializeGraphNeuralNetwork();
+  std::unique_ptr<
+      galois::GraphNeuralNetwork<shad::ShadNodeTy, shad::ShadEdgeTy>> gnn =
+      InitializeGraphNeuralNetwork<shad::ShadNodeTy, shad::ShadEdgeTy>();
   gnn->SetLayerPhases(galois::GNNPhase::kTrain);
   init_timer.stop();
 

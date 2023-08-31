@@ -13,8 +13,8 @@ int main() {
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
 
-  galois::graphs::GNNGraph graph(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  galois::graphs::GNNGraph<char, void> graph(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
   graph.InitializeSamplingData(3, false);
 
   // first, assert all edges are not sampled (should come with all 0s)

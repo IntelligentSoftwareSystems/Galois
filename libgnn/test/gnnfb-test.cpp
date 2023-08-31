@@ -14,8 +14,8 @@ int main() {
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
   // load test graph
-  auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  auto test_graph = std::make_unique<galois::graphs::GNNGraph<char, void>>(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   // 2 layer test with softmax
   std::vector<galois::GNNLayerType> layer_types = {
@@ -36,7 +36,7 @@ int main() {
   // middle 2 are trainable so 12 and 28
   std::vector<size_t> adam_sizes = {12, 28};
   auto adam = std::make_unique<galois::AdamOptimizer>(adam_sizes, 2);
-  auto gnn  = std::make_unique<galois::GraphNeuralNetwork>(
+  auto gnn  = std::make_unique<galois::GraphNeuralNetwork<char, void>>(
       std::move(test_graph), std::move(adam), std::move(gnn_config));
   // for constancy set everything to 1
   gnn->SetAllLayerWeightsTo1();
@@ -171,13 +171,13 @@ int main() {
 
   GALOIS_LOG_VERBOSE("Running with different congifuration");
 
-  test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  test_graph = std::make_unique<galois::graphs::GNNGraph<char, void>>(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
   galois::GraphNeuralNetworkConfig gnn_config2(
       2, layer_types, layer_output_sizes, galois::GNNOutputLayerType::kSoftmax,
       dcon);
   auto adam2 = std::make_unique<galois::AdamOptimizer>(adam_sizes, 2);
-  auto gnn2  = std::make_unique<galois::GraphNeuralNetwork>(
+  auto gnn2  = std::make_unique<galois::GraphNeuralNetwork<char, void>>(
       std::move(test_graph), std::move(adam2), std::move(gnn_config2));
   // run to make sure no crashes occur
   gnn2->DoInference();

@@ -16,11 +16,11 @@ int main() {
 
   // note multi level reading tested in another test
   GALOIS_LOG_VERBOSE("reddit with single label, oec");
-  galois::graphs::GNNGraph("cora", galois::graphs::GNNPartitionScheme::kOEC,
-                           true);
+  galois::graphs::GNNGraph<char, void>("cora", galois::graphs::GNNPartitionScheme::kOEC,
+                           true, false);
   GALOIS_LOG_VERBOSE("reddit with single label, cvc");
-  galois::graphs::GNNGraph("cora", galois::graphs::GNNPartitionScheme::kCVC,
-                           true);
+  galois::graphs::GNNGraph<char, void>("cora", galois::graphs::GNNPartitionScheme::kCVC,
+                           true, false);
 
   // below for when I want to check the remapper
   // galois::graphs::GNNGraph remapper("ogbn-papers100M",

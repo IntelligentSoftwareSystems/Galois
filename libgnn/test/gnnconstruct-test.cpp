@@ -14,8 +14,8 @@ int main() {
                      galois::runtime::getSystemNetworkInterface().ID,
                      num_threads);
   // load test graph
-  auto test_graph = std::make_unique<galois::graphs::GNNGraph>(
-      "tester", galois::graphs::GNNPartitionScheme::kOEC, true);
+  auto test_graph = std::make_unique<galois::graphs::GNNGraph<char, void>>(
+      "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
 
   // 2 layer test with softmax
   std::vector<galois::GNNLayerType> layer_types = {
@@ -28,8 +28,8 @@ int main() {
   std::vector<size_t> adam_sizes = {12, 28};
   auto adam = std::make_unique<galois::AdamOptimizer>(adam_sizes, 2);
 
-  galois::GraphNeuralNetwork gnn(std::move(test_graph), std::move(adam),
-                                 std::move(gnn_config));
+  galois::GraphNeuralNetwork<char, void>
+      gnn(std::move(test_graph), std::move(adam), std::move(gnn_config));
 
   // note this does not include output layer
   GALOIS_LOG_ASSERT(gnn.num_intermediate_layers() == 2);
