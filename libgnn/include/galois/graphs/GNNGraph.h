@@ -297,7 +297,6 @@ public:
       return edge_sample_status_[layer_num].test(ei);
     } else {
       return subgraph_->OutEdgeSampled(ei, layer_num, *this);
-      return false;
     }
   };
   bool IsEdgeSampled(EdgeIterator ei, size_t layer_num) const {
@@ -545,7 +544,6 @@ public:
                   continue;
                 }
               }
-
               MakeEdgeSampled(edge_iter, agg_layer_num);
               uint32_t dest = partitioned_graph_->getEdgeDst(edge_iter);
               if (!IsInSampledGraph(dest)) {
@@ -1072,7 +1070,57 @@ public:
   bool MoreTestMinibatches() { return !test_batcher_->NoMoreMinibatches(); };
 
   //////////////////////////////////////////////////////////////////////////////
-  GNNFloat GetGCNNormFactor(GraphNode lid) const {
+
+  /**
+   * @brief Normalization factor calculation for GCN without graph sampling
+   *
+   * @detail This function calculates normalization factor for nodes
+   * on a GCN layer, but not with graph sampling (ego graph construction).
+   * This normalization is proposed in GCN paper, and its equation is
+   * D^(-1/2)*A*D^(-1/2).
+   * XXX(hc): This degraded accuracy when graph sampling was enabled.
+   * That could be many reasons for that, for example, a graph was already
+   * small, and so, sampled graphs across layers are too small to normalize,
+   * or, it might be theoretical design reason as the original GCN
+   * did not consider ego graph construction.
+   * For example, the one possible reason is that backward phase and
+   * forward phase edge iterators are also different and maybe need to
+   * use different iterators.
+   * For now, I stopped this analysis and
+   * just enabled this method for only GCN without graph
+   * sampling. With graph sampling, I used SAGE's graph normalization.
+   */ 
+  GNNFloat GetGCNNormFactor(GraphNode lid
+      /*, size_t graph_user_layer_num*/) const {
+#if 0
+    if (use_subgraph_ || use_subgraph_view_) {
+      size_t degree;
+      if (!subgraph_choose_all_) {
+        // case because degrees in each layer differ
+        degree =
+            sampled_out_degrees_[graph_user_layer_num][
+                subgraph_->SIDToLID(lid)];
+      } else {
+        // XXX if inductive
+        // degree = global_train_degrees_[subgraph_->SIDToLID(n)];
+        degree = global_degrees_[subgraph_->SIDToLID(lid)];
+      }
+      if (degree) {
+        return 1.0 / std::sqrt(static_cast<float>(degree) + 1);
+      } else {
+        return 0;
+      }
+    } else {
+      if (global_degrees_[lid]) {
+        if (this->size() != this->active_size()) {
+          std::cout << lid << " does not match\n";
+        }
+        return 1.0 / std::sqrt(static_cast<float>(global_degrees_[lid]) + 1);
+      } else {
+        return 0.0;
+      }
+    }
+#endif
     if (global_degrees_[lid]) {
       return 1.0 / std::sqrt(static_cast<float>(global_degrees_[lid]) + 1);
     } else {
@@ -1554,6 +1602,26 @@ public:
   }
   const galois::DynamicBitSet& GetNonLayerZeroMasters() const {
     return non_layer_zero_masters_;
+  }
+
+  // TODO(hc): `ResizeSamplingBitsets()` and
+  // `GetDefinitelySampledNodesBset()` expose private member variables
+  // for unit tests. Other than them, these should not be used.
+
+  void ResizeSamplingBitsets() {
+    if (!bitset_sampled_degrees_.size()) {
+      bitset_sampled_degrees_.resize(partitioned_graph_->size());
+    }
+    if (!bitset_sample_flag_.size()) {
+      bitset_sample_flag_.resize(size());
+    }
+    if (!definitely_sampled_nodes_.size()) {
+      definitely_sampled_nodes_.resize(partitioned_graph_->size());
+    }
+  }
+
+  galois::DynamicBitSet& GetDefinitelySampledNodesBset() {
+    return definitely_sampled_nodes_;
   }
 
 private:

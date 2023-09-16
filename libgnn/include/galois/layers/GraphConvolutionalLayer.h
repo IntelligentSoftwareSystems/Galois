@@ -218,7 +218,25 @@ public:
             this->layer_dimensions_.output_columns) {
       // aggdata can == p_intemp1; in other words, need to use before overwrite
       // mask it, then use it
-      this->MaskInputNonMasters(&agg_data);
+      if (this->layer_number_ != 0) {
+        if (this->graph_.IsSubgraphOn()) {
+          this->MaskInputNonMasters(&agg_data,
+                                    this->layer_dimensions_.output_rows,
+                                    this->graph_.GetNonLayerZeroMasters());
+        } else {
+          this->MaskInputNonMasters(&agg_data,
+                                    this->layer_dimensions_.output_rows);
+        }
+      } else {
+        if (this->graph_.IsSubgraphOn()) {
+          this->MaskGradientNonMasters(input_gradient,
+                                       this->layer_dimensions_.output_rows,
+                                       this->graph_.GetNonLayerZeroMasters());
+        } else {
+          this->MaskGradientNonMasters(input_gradient,
+                                       this->layer_dimensions_.output_rows);
+        }
+      }
 
 #ifdef GALOIS_ENABLE_GPU
       if (device_personality == DevicePersonality::GPU_CUDA) {
@@ -231,9 +249,10 @@ public:
 #endif
         weight_gradient_timer.start();
         // temp 2 holds aggregated feature vectors from forward phase
+        // use output rows since gcn can use subgraphs
         galois::CBlasSGEMM(
             CblasTrans, CblasNoTrans, this->layer_dimensions_.input_columns,
-            this->layer_dimensions_.input_rows,
+            this->layer_dimensions_.output_rows,
             this->layer_dimensions_.output_columns, agg_data.data(),
             input_gradient->data(), this->p_layer_weight_gradients_.data());
         weight_gradient_timer.stop();
@@ -249,7 +268,8 @@ public:
                this->layer_dimensions_.input_rows *
                    this->layer_dimensions_.output_columns);
         // pintemp1 contains (AF)'
-        UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data());
+        UpdateEmbeddingsDerivative(
+            input_gradient->data(), p_in_temp_1_.data());
         // pback contains F'
         // derivative of aggregate is the same due to symmetric graph
         AggregateAll(this->layer_dimensions_.input_columns, p_in_temp_1_.data(),
@@ -271,11 +291,24 @@ public:
       // means I can mess with the input data itself instad of masking the
       // gradients I can mask the input
       if (this->layer_number_ != 0) {
-        this->MaskInputNonMasters(&input_data);
+        if (this->graph_.IsSubgraphOn()) {
+          this->MaskInputNonMasters(&input_data,
+                                    this->layer_dimensions_.input_rows,
+                                    this->graph_.GetNonLayerZeroMasters());
+        } else {
+          this->MaskInputNonMasters(&input_data,
+                                    this->layer_dimensions_.input_rows);
+        }
       } else {
         // if 0 then no input to mask: mask the gradient
         // this is fine because gradient won't be used to get feature gradients
-        this->MaskGradientNonMasters(&p_out_temp_);
+        if (this->graph_.IsSubgraphOn()) {
+          this->MaskGradientNonMasters(&p_out_temp_,
+                                       this->layer_dimensions_.input_rows,
+                                       this->graph_.GetNonLayerZeroMasters());
+        } else {
+          this->MaskGradientNonMasters(&p_out_temp_);
+        }
       }
 
 #ifdef GALOIS_ENABLE_GPU
@@ -347,14 +380,18 @@ private:
   void
   AggregateAllCPU(size_t column_length, const GNNFloat* node_embeddings,
                   GNNFloat* aggregate_output,
-                  galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*) {
+                  galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
+                  bool is_backward) {
     galois::StatTimer aggregate_all_sync_timer("AggregateSync", kRegionName);
-    size_t num_nodes   = this->graph_.size();
+    size_t num_nodes   = (is_backward)?
+        this->layer_dimensions_.input_rows :
+        this->layer_dimensions_.output_rows;
     size_t last_master = *(this->graph_.end_owned());
+
     assert(0 == *(this->graph_.begin_owned()));
 
     galois::do_all(
-        galois::iterate(static_cast<size_t>(0), num_nodes),
+        galois::iterate(*(this->graph_.begin()), num_nodes),
         [&](size_t src) {
           size_t index_to_src_feature = src * column_length;
           // zero out src feature first
@@ -364,24 +401,31 @@ private:
 
           if (this->layer_phase_ == GNNPhase::kTrain) {
             if (this->IsSampledLayer()) {
-              // XXX(loc)
-              GALOIS_LOG_WARN(
-                  "Edge sampling not yet implemented for GCN; only SAGE");
-              // check if node is part of sampled graph; ignore after 0'ing if
-              // not sampled
-              if (!this->graph_.IsInSampledGraph(src))
+              // Check if node is part of sampled graph; ignore after
+              // 0'ing if it is not sampled.
+              // TODO(hc): check if SAGE also checks this
+              if (!this->graph_.IsInSampledGraph(src)) {
                 return;
+              }
             }
           }
 
-          GNNFloat source_norm = 0.0;
+          GNNFloat source_norm = 1.0;
           if (!this->config_.disable_normalization) {
-            source_norm = this->graph_.GetGCNNormFactor(src);
+            if (this->graph_.IsSubgraphOn() ||
+                this->graph_.IsSubgraphViewOn()) {
+              source_norm =
+                  this->graph_.GetDegreeNorm(
+                      src, this->graph_user_layer_number_);
+            } else {
+              source_norm = this->graph_.GetGCNNormFactor(src);
+            }
           }
 
           // init to self
           if (!this->config_.disable_self_aggregate) {
-            graphs::bitset_graph_aggregate.set(src);
+            graphs::bitset_graph_aggregate.set(
+                this->graph_.ConvertToLID(src));
             // only aggregate self once on master
             if (src < last_master) {
               for (size_t i = 0; i < column_length; i++) {
@@ -393,25 +437,44 @@ private:
           }
 
           // loop through all destinations to grab the feature to aggregate
-          for (auto e = this->graph_.edge_begin(src);
-               e != this->graph_.edge_end(src); e++) {
-            size_t dst = this->graph_.GetEdgeDest(e);
-            graphs::bitset_graph_aggregate.set(src);
-
-            if (this->layer_phase_ == GNNPhase::kTrain) {
+          auto e_beg = (is_backward)?
+              this->graph_.in_edge_begin(src) : this->graph_.edge_begin(src);
+          auto e_end = (is_backward)?
+              this->graph_.in_edge_end(src) : this->graph_.edge_end(src);
+          for (auto e = e_beg; e != e_end; e++) {
+            if (this->layer_phase_ == GNNPhase::kTrain ||
+                this->layer_phase_ == GNNPhase::kBatch) {
               if (this->IsSampledLayer()) {
-                // ignore non-sampled nodes
-                if (this->layer_phase_ == GNNPhase::kTrain &&
-                    !this->graph_.IsInSampledGraph(dst))
+                bool is_sampled = (is_backward)?
+                    this->graph_.IsInEdgeSampled(
+                        e, this->graph_user_layer_number_) :
+                    this->graph_.IsEdgeSampled(
+                        e, this->graph_user_layer_number_);
+                // ignore non-sampled nodes and edges
+                if (!is_sampled) {
                   continue;
+                }
               }
             }
-
+            size_t dst = (is_backward)?
+                this->graph_.GetInEdgeDest(e) : this->graph_.GetEdgeDest(e);
+            graphs::bitset_graph_aggregate.set(
+                this->graph_.ConvertToLID(src));
             size_t index_to_dst_feature = dst * column_length;
 
             if (!this->config_.disable_normalization) {
-              GNNFloat norm_scale =
-                  source_norm * this->graph_.GetGCNNormFactor(dst);
+              GNNFloat norm_scale;
+              if (this->graph_.IsSubgraphOn() ||
+                  this->graph_.IsSubgraphViewOn()) {
+                norm_scale = (is_backward)?
+                    this->graph_.GetDegreeNorm(
+                        dst, this->graph_user_layer_number_)
+                    : source_norm;
+              } else {
+                norm_scale =
+                    source_norm * this->graph_.GetGCNNormFactor(dst);
+              }
+
               galois::VectorMulAdd(
                   column_length, &aggregate_output[index_to_src_feature],
                   &node_embeddings[index_to_dst_feature], norm_scale,
@@ -429,7 +492,8 @@ private:
         galois::loopname("ConvolutionalAggregateAll"));
     // aggregate sync
     aggregate_all_sync_timer.start();
-    this->graph_.AggregateSync(aggregate_output, column_length);
+    this->graph_.AggregateSync(aggregate_output, column_length,
+          is_backward, num_nodes);
     aggregate_all_sync_timer.stop();
   }
 
@@ -469,7 +533,8 @@ private:
                                     this->layer_number_);
     } else {
 #endif
-      AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts);
+      AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts,
+          is_backward);
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
@@ -495,7 +560,8 @@ private:
                          this->layer_dimensions_.input_rows,
                          this->layer_dimensions_.input_columns,
                          this->layer_dimensions_.output_columns,
-                         node_embeddings, this->layer_weights_.data(), output);
+                         node_embeddings, this->layer_weights_.data(),
+                         output);
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
@@ -503,7 +569,8 @@ private:
   }
 
   //! Calculate graident via mxm with last layer's gradients (backward)
-  void UpdateEmbeddingsDerivative(const GNNFloat* gradients, GNNFloat* output) {
+  void UpdateEmbeddingsDerivative(
+      const GNNFloat* gradients, GNNFloat* output) {
     galois::StatTimer timer("BackwardXform", kRegionName);
     timer.start();
 

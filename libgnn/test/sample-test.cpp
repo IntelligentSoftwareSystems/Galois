@@ -1,6 +1,22 @@
 //! @file sample-test.cpp
 //! Sampling tester
 
+/// TODO(hc): This test is deprecated as GCN layer now supports
+/// edge sampling, as well as node sampling.
+/// The previous GCN only checks if node is sampled, but
+/// now it checks edge sampling and for that, it utilizes
+/// a bitset to mark sampled edges.
+/// If that bitset is not set, the corresponding edge is ignored.
+/// However, this test currently does not consider this case,
+/// and doesn't work.
+/// To satisfy the previous assumption and make this test work,
+/// we should mark the entire adjacent edges of the sampled nodes.
+/// In this case, we should not mark the edges' destination nodes as
+/// sampled nodes, and so, let src node iterator skip those nodes
+/// but only allow to iterate them as outgoing destinations.
+/// We can reuse this code later, and so, I will not remove this
+/// from the current source tree.
+
 #include "galois/Logging.h"
 #include "galois/GNNMath.h"
 #include "galois/layers/GraphConvolutionalLayer.h"
