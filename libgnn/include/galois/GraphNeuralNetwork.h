@@ -14,6 +14,7 @@
 #include "galois/layers/DenseLayer.h"
 #include "galois/layers/GraphConvolutionalLayer.h"
 #include "galois/layers/L2NormLayer.h"
+#include "galois/layers/ReLULayer.h"
 #include "galois/layers/SAGELayer.h"
 #include "galois/layers/SigmoidLayer.h"
 #include "galois/layers/SoftmaxLayer.h"
@@ -224,6 +225,11 @@ public:
         break;
       case GNNLayerType::kL2Norm:
         gnn_layers_.push_back(std::move(std::make_unique<L2NormLayer<VTy, ETy>>(
+            i, *graph_, &prev_output_layer, layer_dims,
+            config_.default_layer_config())));
+        break;
+      case GNNLayerType::kReLU:
+        gnn_layers_.push_back(std::move(std::make_unique<ReLULayer<VTy, ETy>>(
             i, *graph_, &prev_output_layer, layer_dims,
             config_.default_layer_config())));
         break;

@@ -63,6 +63,7 @@ llvm::cl::opt<galois::GNNLayerType> cl_layer_type(
         clEnumValN(galois::GNNLayerType::kSAGE, "sage",
                    "SAGE layer (GCN with concat + mean)"),
         clEnumValN(galois::GNNLayerType::kL2Norm, "l2norm", "L2 norm layer"),
+        clEnumValN(galois::GNNLayerType::kReLU, "ReLU", "ReLU norm layer"),
         clEnumValN(galois::GNNLayerType::kDense, "dense", "Dense layer")),
     cll::init(galois::GNNLayerType::kSAGE));
 

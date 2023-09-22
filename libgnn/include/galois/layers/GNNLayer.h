@@ -26,7 +26,9 @@ enum class GNNLayerType {
   //! Dense linear xform layer
   kDense,
   //! L2 normalization layer
-  kL2Norm
+  kL2Norm,
+  //! ReLU layer
+  kReLU
   // TODO GAT
 };
 
@@ -647,7 +649,6 @@ protected:
   void ActivationDerivative(PointerWithSize<GNNFloat>* gradient) {
     galois::StatTimer timer("BackwardActivation", "GNNLayer");
     TimerStart(&timer);
-
 #ifdef GALOIS_ENABLE_GPU
     if (device_personality == DevicePersonality::GPU_CUDA) {
       base_gpu_object_.ActivationDerivativeGPU(gradient->data(),
