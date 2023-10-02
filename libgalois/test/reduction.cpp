@@ -12,11 +12,11 @@ struct Move {
   Move(const Move&) = delete;
   Move(Move&&) noexcept {}
   Move& operator=(const Move&) = delete;
-  Move& operator               =(Move&&) noexcept { return *this; }
+  Move& operator=(Move&&) noexcept { return *this; }
 };
 
 void test_move() {
-  auto merge_fn = [](Move& a, Move &&) -> Move& { return a; };
+  auto merge_fn = [](Move& a, Move&&) -> Move& { return a; };
 
   auto identity_fn = []() { return Move(); };
 

@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
 
   // dimensions from test case
   size_t a_dim = 12000000;
-  //size_t a_dim = 120000;
+  // size_t a_dim = 120000;
   size_t b_dim = 128;
   size_t c_dim = 16;
 
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
   std::vector<float> matrix_1(a_dim * b_dim);
   std::vector<float> matrix_2(a_dim * c_dim);
   // output
-  //std::vector<float> matrix_3(a_dim * c_dim);
+  // std::vector<float> matrix_3(a_dim * c_dim);
   std::vector<float> matrix_3(b_dim * c_dim);
 
   size_t kBigSize = 1000000000;
@@ -126,16 +126,19 @@ int main(int argc, char* argv[]) {
     auto start = std::chrono::high_resolution_clock::now();
     // transpose because it's the same as the problematic call in GNN
     // TODO(loc) non transpose version
-    //CBlasSGEMM(CblasNoTrans, CblasNoTrans, a_dim, b_dim, c_dim, matrix_1.data(),
+    // CBlasSGEMM(CblasNoTrans, CblasNoTrans, a_dim, b_dim, c_dim,
+    // matrix_1.data(),
     //           matrix_2.data(), matrix_3.data());
     CBlasSGEMM(CblasTrans, CblasNoTrans, b_dim, a_dim, c_dim, matrix_1.data(),
                matrix_2.data(), matrix_3.data());
-    //CBlasSGEMM(CblasNoTrans, CblasTrans, b_dim, a_dim, c_dim, matrix_1.data(),
-    //           matrix_2.data(), matrix_3.data());
+    // CBlasSGEMM(CblasNoTrans, CblasTrans, b_dim, a_dim, c_dim,
+    // matrix_1.data(),
+    //            matrix_2.data(), matrix_3.data());
     auto stop = std::chrono::high_resolution_clock::now();
 
-    auto duration = std::chrono::time_point_cast<std::chrono::milliseconds>(stop) - 
-                    std::chrono::time_point_cast<std::chrono::microseconds>(start);
+    auto duration =
+        std::chrono::time_point_cast<std::chrono::milliseconds>(stop) -
+        std::chrono::time_point_cast<std::chrono::microseconds>(start);
     printf("Run duration is %lf ms\n", duration.count() / 1000.0);
   }
 

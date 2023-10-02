@@ -542,9 +542,9 @@ private:
         dst->acquire(mflag);
         EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
         ii        = dst->createEdgeWithReuse(src, e, Directional ? true : false,
-                                      std::forward<Args>(args)...);
+                                             std::forward<Args>(args)...);
         ii        = src->createEdgeWithReuse(dst, e, false,
-                                      std::forward<Args>(args)...);
+                                             std::forward<Args>(args)...);
       }
     }
     return boost::make_filter_iterator(is_out_edge(), ii, src->end());
@@ -565,7 +565,7 @@ private:
         dst->acquire(mflag);
         EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
         ii        = dst->createEdge(src, e, Directional ? true : false,
-                             std::forward<Args>(args)...);
+                                    std::forward<Args>(args)...);
         ii        = src->createEdge(dst, e, false, std::forward<Args>(args)...);
       }
     }
@@ -634,7 +634,7 @@ private:
   EdgeTy*
   constructOutEdgeValue(FileGraph&, typename FileGraph::edge_iterator,
                         GraphNode src, GraphNode dst,
-                        typename std::enable_if<_A1 && !_A2>::type* = 0) {
+                        typename std::enable_if<_A1&& !_A2>::type* = 0) {
     return createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
 

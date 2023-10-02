@@ -37,7 +37,7 @@ int main() {
 
   galois::GNNLayerConfig dcon;
   dcon.disable_aggregate_after_update = false;
-  dcon.disable_normalization = false;
+  dcon.disable_normalization          = false;
   dcon.DebugConfig();
   // Choose a few sample nodes
   test_graph.SetSampledNode(0);
@@ -52,7 +52,7 @@ int main() {
   test_graph.SampleAllEdges(0, false, 1);
 
   // After the above lines, nodes 0, 1, 3, 4, 5 and
-  // edges 0, 7, 8 should be sampled. 
+  // edges 0, 7, 8 should be sampled.
   // So,
   // 0 -> 1, 2 <- 3 -> 4
   GALOIS_LOG_ASSERT(test_graph.IsInSampledGraph(0));
@@ -64,9 +64,7 @@ int main() {
   GALOIS_LOG_ASSERT(test_graph.IsEdgeSampledAny(7));
   GALOIS_LOG_ASSERT(test_graph.IsEdgeSampledAny(8));
 
-
-  galois::DynamicBitSet& bset =
-      test_graph.GetDefinitelySampledNodesBset();
+  galois::DynamicBitSet& bset = test_graph.GetDefinitelySampledNodesBset();
   bset.ParallelReset();
   bset.set(0);
   bset.set(1);
@@ -77,8 +75,8 @@ int main() {
   test_graph.EnableSubgraph();
 
   galois::GNNLayerDimensions dimension_0;
-  dimension_0.input_rows = 5;
-  dimension_0.input_columns = 3;
+  dimension_0.input_rows     = 5;
+  dimension_0.input_columns  = 3;
   dimension_0.output_columns = 2;
 
   // Layer declaration
@@ -115,8 +113,7 @@ int main() {
   dummy_ones_v[5] = 0;
 
   galois::PointerWithSize<galois::GNNFloat> layer_1_backward_output =
-      layer_1->BackwardPhase(
-          test_graph.GetLocalFeatures(), &dummy_ones);
+      layer_1->BackwardPhase(test_graph.GetLocalFeatures(), &dummy_ones);
 
   GALOIS_LOG_ASSERT(layer_1_backward_output[0] == 0);
   GALOIS_LOG_ASSERT(layer_1_backward_output[1] == 0);
@@ -136,7 +133,7 @@ int main() {
 
   galois::PointerWithSize<galois::GNNFloat> layer_1_weight_gradients =
       layer_1->GetLayerWeightGradients();
-  
+
   GALOIS_LOG_ASSERT(layer_1_weight_gradients[0] == 6);
   GALOIS_LOG_ASSERT(layer_1_weight_gradients[1] == 6);
   GALOIS_LOG_ASSERT(layer_1_weight_gradients[2] == 6);

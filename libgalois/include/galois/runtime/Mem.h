@@ -554,8 +554,8 @@ public:
 // std::unique_ptr<Derived>();
 
 template <typename Derived>
-substrate::PtrLock<Derived>
-    StaticSingleInstance<Derived>::ptr = substrate::PtrLock<Derived>();
+substrate::PtrLock<Derived> StaticSingleInstance<Derived>::ptr =
+    substrate::PtrLock<Derived>();
 
 class PageHeap : public StaticSingleInstance<PageHeap> {
 

@@ -20,7 +20,7 @@ struct GradientSync {
     }
     weight += y;
     // need a post process divide all step
-    //weight /= 2;
+    // weight /= 2;
     return true;
   }
 

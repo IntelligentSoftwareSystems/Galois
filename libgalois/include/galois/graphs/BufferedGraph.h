@@ -294,22 +294,22 @@ public:
    * the current host
    */
   void constructFrom(uint64_t* _outIndexBuffer, uint32_t* _edgeDestBuffer,
-      EdgeDataType* _edgeDataBuffer, uint32_t _globalSize,
-      uint64_t _globalEdgeSize, uint32_t _numLocalNodes,
-      uint64_t _numLocalEdges, uint64_t _nodeOffset,
-      uint64_t _edgeOffset) {
+                     EdgeDataType* _edgeDataBuffer, uint32_t _globalSize,
+                     uint64_t _globalEdgeSize, uint32_t _numLocalNodes,
+                     uint64_t _numLocalEdges, uint64_t _nodeOffset,
+                     uint64_t _edgeOffset) {
     assert(_outIndexBuffer != nullptr);
     assert(_edgeDestBuffer != nullptr);
     assert(_edgeDataBuffer != nullptr);
     outIndexBuffer = _outIndexBuffer;
     edgeDestBuffer = _edgeDestBuffer;
     edgeDataBuffer = _edgeDataBuffer;
-    globalSize = _globalSize;
+    globalSize     = _globalSize;
     globalEdgeSize = _globalEdgeSize;
-    numLocalNodes = _numLocalNodes;
-    numLocalEdges = _numLocalEdges;
-    nodeOffset = _nodeOffset;
-    edgeOffset = _edgeOffset;
+    numLocalNodes  = _numLocalNodes;
+    numLocalEdges  = _numLocalEdges;
+    nodeOffset     = _nodeOffset;
+    edgeOffset     = _edgeOffset;
     resetReadCounters();
     graphLoaded = true;
     numBytesReadOutIndex += sizeof(uint64_t);

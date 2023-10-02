@@ -81,8 +81,8 @@ void relu_cpu(size_t n, const float_t* in, float_t* out);
 void d_relu_cpu(size_t n, const float_t* in, const float_t* data, float_t* out);
 
 // Leaky ReLU
-void leaky_relu(float_t epsilon, float_t in, float_t &out);
-void d_leaky_relu(float_t epsilon, float_t in, float_t data, float_t &out);
+void leaky_relu(float_t epsilon, float_t in, float_t& out);
+void d_leaky_relu(float_t epsilon, float_t in, float_t data, float_t& out);
 void leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in, float_t* out);
 void d_leaky_relu_cpu(size_t n, float_t epsilon, const float_t* in,
                       const float_t* data, float_t* out);
@@ -171,8 +171,10 @@ void float_copy_device(int n, float_t* h_ptr, float_t* d_ptr);
 void uint8_malloc_device(int n, uint8_t*& ptr);
 void uint8_free_device(uint8_t*& ptr);
 void uint8_copy_device(int n, uint8_t* h_ptr, uint8_t* d_ptr);
-acc_t masked_avg_loss_gpu(int begin, int end, int count, mask_t* masks, float_t* loss);
+acc_t masked_avg_loss_gpu(int begin, int end, int count, mask_t* masks,
+                          float_t* loss);
 acc_t l2_norm_gpu(int n, const float_t* in);
 void l2_norm_gpu(size_t x, size_t y, const float_t* in, float_t* out);
-void d_l2_norm_gpu(size_t x, size_t y, const float_t* in_data, float_t* in_diff, float_t* out_diff);
+void d_l2_norm_gpu(size_t x, size_t y, const float_t* in_data, float_t* in_diff,
+                   float_t* out_diff);
 #endif

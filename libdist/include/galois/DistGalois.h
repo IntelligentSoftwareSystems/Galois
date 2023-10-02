@@ -44,10 +44,10 @@ public:
 
   ~DistMemSys();
 
-  DistMemSys(const DistMemSys&) = delete;
+  DistMemSys(const DistMemSys&)            = delete;
   DistMemSys& operator=(const DistMemSys&) = delete;
 
-  DistMemSys(DistMemSys&&) = delete;
+  DistMemSys(DistMemSys&&)            = delete;
   DistMemSys& operator=(DistMemSys&&) = delete;
 };
 

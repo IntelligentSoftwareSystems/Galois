@@ -397,8 +397,8 @@ public:
                                 *edgeEnd, base_DistGraph::numGlobalNodes,
                                 base_DistGraph::numGlobalEdges);
     } else {
-      constructCSRFromSHADGraph(
-          &bufGraph, &shadConverter, nodeBegin, nodeEnd, host_prefix);
+      constructCSRFromSHADGraph(&bufGraph, &shadConverter, nodeBegin, nodeEnd,
+                                host_prefix);
     }
 
     graphReadTimer.stop();
@@ -608,10 +608,11 @@ private:
   template <
       typename T                                                      = NodeTy,
       typename std::enable_if_t<std::is_same_v<T, shad::ShadNodeTy>>* = nullptr>
-  void constructCSRFromSHADGraph(
-      galois::graphs::BufferedGraph<EdgeTy>* bufGraph,
-      shad::ShadGraphConverter* shadConverter,
-      uint64_t nodeBegin, uint64_t nodeEnd, std::string host_prefix) {
+  void
+  constructCSRFromSHADGraph(galois::graphs::BufferedGraph<EdgeTy>* bufGraph,
+                            shad::ShadGraphConverter* shadConverter,
+                            uint64_t nodeBegin, uint64_t nodeEnd,
+                            std::string host_prefix) {
     uint32_t numLocalNodes = nodeEnd - nodeBegin;
     // So, this holds outgoing edge array of a whole (global) graph.
     uint64_t* outIndexBuffer = shadConverter->getOutIndexBuffer();
@@ -625,14 +626,13 @@ private:
     // From now on, those arrays store local node information
     // as a dense memory representation.
     shadConverter->extractLocalOutIndexArray(nodeBegin, nodeEnd);
-    galois::gInfo(host_prefix,
-                  "Completes local out index array construction");
+    galois::gInfo(host_prefix, "Completes local out index array construction");
 
     galois::gInfo(host_prefix, "Starts edge destination/data "
                                "array construction");
     uint64_t numLocalEdges = edgeEnd - edgeBegin;
     shadConverter->constructEdgeArrays(nodeBegin, edgeBegin, numLocalNodes,
-                                      numLocalEdges);
+                                       numLocalEdges);
 
     galois::gInfo(host_prefix, "Completes edge destination/data "
                                "array construction");
@@ -646,12 +646,12 @@ private:
   }
 
   // Disable this method for non-SHAD graph construction.
-  template <
-      typename T                                                      = NodeTy,
-      typename std::enable_if_t<!std::is_same_v<T, shad::ShadNodeTy>>* = nullptr>
-  void constructCSRFromSHADGraph(
-      galois::graphs::BufferedGraph<EdgeTy>*,
-      shad::ShadGraphConverter*, uint64_t, uint64_t, std::string) {}
+  template <typename T = NodeTy,
+            typename std::enable_if_t<!std::is_same_v<T, shad::ShadNodeTy>>* =
+                nullptr>
+  void constructCSRFromSHADGraph(galois::graphs::BufferedGraph<EdgeTy>*,
+                                 shad::ShadGraphConverter*, uint64_t, uint64_t,
+                                 std::string) {}
 
   /**
    * @brief Assign a SHAD node type to a node data.

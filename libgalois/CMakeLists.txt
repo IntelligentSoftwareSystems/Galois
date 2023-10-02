@@ -10,7 +10,7 @@ set(sources
         "${CMAKE_CURRENT_BINARY_DIR}/Version.cpp"
         src/Barrier_Counting.cpp
         src/Barrier.cpp
-        src/Barrier_Dissemination.cpp 
+        src/Barrier_Dissemination.cpp
         src/Barrier_MCS.cpp
         src/Barrier_Pthread.cpp
         src/Barrier_Simple.cpp

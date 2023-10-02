@@ -35,7 +35,7 @@ namespace galois {
 
 // Experimental random access iterator. Slower than old iterator for simple
 // traversals, so disable for now
-//#define _NEW_ITERATOR
+// #define _NEW_ITERATOR
 
 //! Like std::deque but use Galois memory management functionality
 template <typename T, unsigned ChunkSize = 64,
@@ -277,7 +277,7 @@ public:
     return *this;
   }
 
-  gdeque(const gdeque&) = delete;
+  gdeque(const gdeque&)            = delete;
   gdeque& operator=(const gdeque&) = delete;
 
   ~gdeque() { clear(); }

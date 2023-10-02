@@ -71,8 +71,8 @@ int main() {
 
   // create layer 1 for testing backward prop actually giving weights back
   std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(1, test_graph, &p_back,
-                                                        dimension_0, dcon);
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(
+          1, test_graph, &p_back, dimension_0, dcon);
   layer_1->InitAllWeightsTo1();
   galois::PointerWithSize<galois::GNNFloat> layer_1_forward_output =
       layer_1->ForwardPhase(test_graph.GetLocalFeatures());

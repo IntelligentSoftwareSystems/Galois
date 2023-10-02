@@ -66,6 +66,6 @@ enum class TYPES {
   NONE
 };
 
-} // namespace agile::workflow1
+} // namespace shad
 
 #endif // GRAPHTYPES_H

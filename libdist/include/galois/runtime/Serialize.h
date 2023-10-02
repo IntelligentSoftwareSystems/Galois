@@ -1055,9 +1055,10 @@ inline void gDeserialize(DeSerializeBuffer&) {}
  * @param data Object to save data in the iterator type into
  */
 template <typename Iter, typename T>
-auto gDeserializeRaw(Iter iter, T& data) -> decltype(
-    std::declval<typename std::enable_if<is_memory_copyable<T>::value>::type>(),
-    Iter()) {
+auto gDeserializeRaw(Iter iter, T& data)
+    -> decltype(std::declval<typename std::enable_if<
+                    is_memory_copyable<T>::value>::type>(),
+                Iter()) {
   unsigned char* pdata = (unsigned char*)&data;
   for (size_t i = 0; i < sizeof(T); ++i)
     pdata[i] = *iter++;

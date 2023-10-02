@@ -10,8 +10,8 @@
 #include "galois/layers/GNNLayer.cuh"
 #endif
 
-//#define PRINT_VEC_LOG_
-//#define PRINT_GPU_VEC_
+// #define PRINT_VEC_LOG_
+// #define PRINT_GPU_VEC_
 
 namespace galois {
 

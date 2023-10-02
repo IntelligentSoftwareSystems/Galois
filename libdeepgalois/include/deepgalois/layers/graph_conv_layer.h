@@ -74,7 +74,7 @@ private:
   float_t* in_temp1;
   float_t* trans_data;  // y*x
   mask_t* dropout_mask; // x*y
-  float_t epsilon; // LeakyReLU angle of negative slope: set to 0.2
+  float_t epsilon;      // LeakyReLU angle of negative slope: set to 0.2
 
   // Glorot & Bengio (AISTATS 2010)
   inline void rand_init_matrix(size_t dim_x, size_t dim_y, vec_t& matrix,

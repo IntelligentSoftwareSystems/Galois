@@ -33,8 +33,8 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
   std::unique_ptr<galois::SAGELayer<char, void>> layer_0 =
-      std::make_unique<galois::SAGELayer<char, void>>(0, test_graph, &p_null, dimension_0,
-                                          dcon, scon);
+      std::make_unique<galois::SAGELayer<char, void>>(0, test_graph, &p_null,
+                                                      dimension_0, dcon, scon);
   layer_0->InitAllWeightsTo1();
   // sage weights for self
   layer_0->InitSelfWeightsTo1();
@@ -113,8 +113,8 @@ int main() {
 
   // create layer 1 for testing backward prop actually giving weights back
 
-  auto layer_1 = std::make_unique<galois::SAGELayer<char, void>>(1, test_graph, &p_back,
-                                                     dimension_0, dcon, scon);
+  auto layer_1 = std::make_unique<galois::SAGELayer<char, void>>(
+      1, test_graph, &p_back, dimension_0, dcon, scon);
   layer_1->InitAllWeightsTo1();
   layer_1->InitSelfWeightsTo1();
 
@@ -205,8 +205,8 @@ int main() {
   // (verification requires floating point accuracy or setting a seed which I
   // don't have time for at the moment
   // TODO in future maybe add better unit test for this
-  auto layer_2 = std::make_unique<galois::SAGELayer<char, void>>(1, test_graph, &p_back,
-                                                     dimension_0, config, scon);
+  auto layer_2 = std::make_unique<galois::SAGELayer<char, void>>(
+      1, test_graph, &p_back, dimension_0, config, scon);
   galois::PointerWithSize<galois::GNNFloat> l2_fo =
       layer_2->ForwardPhase(test_graph.GetLocalFeatures());
   GALOIS_LOG_ASSERT(l2_fo.size() == 14);

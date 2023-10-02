@@ -191,7 +191,7 @@ void Net::read_test_masks(std::string dataset) {
     for (size_t i = globalTestBegin; i < globalTestEnd; i++)
         globalTestMasks[i] = 1;
   } else {
-    globalTestCount = distContext->read_masks(dataset, std::string("test"), 
+    globalTestCount = distContext->read_masks(dataset, std::string("test"),
         globalSamples, globalTestBegin, globalTestEnd, globalTestMasks, NULL);
   }
   //copy_test_masks_to_device();

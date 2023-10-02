@@ -212,7 +212,7 @@ public:
     return *this;
   }
 
-  InsertBag(const InsertBag&) = delete;
+  InsertBag(const InsertBag&)            = delete;
   InsertBag& operator=(const InsertBag&) = delete;
 
   ~InsertBag() { destruct_parallel(); }

@@ -67,7 +67,7 @@ public:
     }
   }
 
-  FixedSizeBagBase(const FixedSizeBagBase& o) = delete;
+  FixedSizeBagBase(const FixedSizeBagBase& o)            = delete;
   FixedSizeBagBase& operator=(const FixedSizeBagBase& o) = delete;
 
   ~FixedSizeBagBase() { clear(); }
@@ -284,7 +284,7 @@ public:
     }
   }
 
-  FixedSizeRing(const FixedSizeRing& o) = delete;
+  FixedSizeRing(const FixedSizeRing& o)            = delete;
   FixedSizeRing& operator=(const FixedSizeRing& o) = delete;
 
   ~FixedSizeRing() { clear(); }

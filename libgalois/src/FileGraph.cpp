@@ -709,7 +709,7 @@ void FileGraphWriter::phase1() {
   graphVersion = numNodes <= std::numeric_limits<uint32_t>::max() ? 1 : 2;
 
   size_t bytes    = galois::graphs::rawBlockSize(numNodes, numEdges, sizeofEdge,
-                                              graphVersion);
+                                                 graphVersion);
   char* mmap_base = reinterpret_cast<char*>(mmap(
       nullptr, bytes, PROT_READ | PROT_WRITE, _MAP_ANON | MAP_PRIVATE, -1, 0));
   if (mmap_base == MAP_FAILED)

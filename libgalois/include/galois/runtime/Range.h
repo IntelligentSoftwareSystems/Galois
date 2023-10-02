@@ -303,8 +303,8 @@ template <typename C>
 class HasLocalIter {
 
   template <typename T>
-  using CallExprType = typename std::remove_reference<decltype(
-      std::declval<T>().local_begin())>::type;
+  using CallExprType = typename std::remove_reference<
+      decltype(std::declval<T>().local_begin())>::type;
 
   template <typename T>
   static std::true_type go(typename std::add_pointer<CallExprType<T>>::type);

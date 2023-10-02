@@ -60,8 +60,8 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> p_back(back_matrix);
 
   std::unique_ptr<galois::GraphConvolutionalLayer<char, void>> layer_1 =
-      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(1, test_graph, &p_back,
-                                                        dimension_0, dcon);
+      std::make_unique<galois::GraphConvolutionalLayer<char, void>>(
+          1, test_graph, &p_back, dimension_0, dcon);
   layer_1->InitAllWeightsTo1();
   layer_1->EnableSampling();
 

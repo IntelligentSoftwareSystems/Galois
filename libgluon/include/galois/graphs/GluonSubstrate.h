@@ -473,14 +473,13 @@ public:
 
   void RevertHandshakeToRealGraph() {
     // XXX make sure I dont need anything else
-    masterNodes = &master_nodes_concrete_;
-    mirrorNodes = &(userGraph.getMirrorNodes());
+    masterNodes   = &master_nodes_concrete_;
+    mirrorNodes   = &(userGraph.getMirrorNodes());
     maxSharedSize = original_max_shared_size_;
   }
 
-  void
-  SetupSubgraphMirrors(std::vector<std::vector<size_t>>& subgraph_mirrors,
-                       bool use_timer) {
+  void SetupSubgraphMirrors(std::vector<std::vector<size_t>>& subgraph_mirrors,
+                            bool use_timer) {
     galois::StatTimer t("SubgraphMirrorSetup");
     if (use_timer) {
       t.start();
@@ -4751,13 +4750,13 @@ public:
 ///*
 // * Headers for boost serialization
 // */
-//#include <boost/archive/binary_oarchive.hpp>
-//#include <boost/archive/binary_iarchive.hpp>
-//#include <boost/serialization/split_member.hpp>
-//#include <boost/serialization/binary_object.hpp>
-//#include <boost/serialization/serialization.hpp>
-//#include <boost/serialization/vector.hpp>
-//#include <boost/serialization/unordered_map.hpp>
+// #include <boost/archive/binary_oarchive.hpp>
+// #include <boost/archive/binary_iarchive.hpp>
+// #include <boost/serialization/split_member.hpp>
+// #include <boost/serialization/binary_object.hpp>
+// #include <boost/serialization/serialization.hpp>
+// #include <boost/serialization/vector.hpp>
+// #include <boost/serialization/unordered_map.hpp>
 //
 // public:
 //  /**

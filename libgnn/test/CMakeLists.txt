@@ -94,7 +94,7 @@ if (NOT GALOIS_ENABLE_GPU)
   add_executable(softmaxlayer-test softmaxlayer-test.cpp)
   target_link_libraries(softmaxlayer-test galois_gnn)
   add_test(NAME softmaxlayer-test COMMAND softmaxlayer-test)
-  
+
   add_executable(sigmoidlayer-test sigmoidlayer-test.cpp)
   target_link_libraries(sigmoidlayer-test galois_gnn)
   add_test(NAME sigmoidlayer-test COMMAND sigmoidlayer-test)
@@ -102,19 +102,19 @@ if (NOT GALOIS_ENABLE_GPU)
   add_executable(gnnconstruct-test gnnconstruct-test.cpp)
   target_link_libraries(gnnconstruct-test galois_gnn)
   add_test(NAME gnnconstruct-test COMMAND gnnconstruct-test)
-  
+
   add_executable(gnnfb-test gnnfb-test.cpp)
   target_link_libraries(gnnfb-test galois_gnn)
   add_test(NAME gnnfb-test COMMAND gnnfb-test)
-  
+
   add_executable(adam-test adam-test.cpp)
   target_link_libraries(adam-test galois_gnn)
   add_test(NAME adam-test COMMAND adam-test)
-  
+
   add_executable(accuracy-test accuracy-test.cpp)
   target_link_libraries(accuracy-test galois_gnn)
   add_test(NAME accuracy-test COMMAND accuracy-test)
-  
+
   add_executable(epoch-test epoch-test.cpp)
   target_link_libraries(epoch-test galois_gnn)
   add_test(NAME epoch-test COMMAND epoch-test)

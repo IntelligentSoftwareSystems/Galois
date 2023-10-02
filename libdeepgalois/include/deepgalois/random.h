@@ -50,4 +50,4 @@ uniform_rand(T min, T max) {
   std::uniform_real_distribution<T> dst(min, max);
   return dst(random_generator::get_instance()());
 }
-} //end of namespace
+} // namespace deepgalois

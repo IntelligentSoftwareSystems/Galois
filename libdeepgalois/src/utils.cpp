@@ -109,9 +109,9 @@ acc_t masked_f1_score(size_t begin, size_t end, size_t, mask_t* masks,
   double precision_mic = tp_accum + fp_accum > 0
                              ? (double)tp_accum / (double)(tp_accum + fp_accum)
                              : 0.;
-  double recall_mic = tp_accum + fn_accum > 0
-                          ? (double)tp_accum / (double)(tp_accum + fn_accum)
-                          : 0.;
+  double recall_mic    = tp_accum + fn_accum > 0
+                             ? (double)tp_accum / (double)(tp_accum + fn_accum)
+                             : 0.;
   double f1_micro =
       recall_mic + precision_mic > 0.
           ? 2. * (recall_mic * precision_mic) / (recall_mic + precision_mic)

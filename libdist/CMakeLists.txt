@@ -49,7 +49,7 @@ if (GALOIS_USE_LCI)
 
   add_dependencies(galois_dist_async lci)
   target_link_libraries(galois_dist_async PRIVATE ${LCI_LIBRARY} -lpsm2)
-  target_include_directories(galois_dist_async PUBLIC 
+  target_include_directories(galois_dist_async PUBLIC
     $<BUILD_INTERFACE:${LCI_INCLUDE}>
     $<INSTALL_INTERFACE:include>
   )

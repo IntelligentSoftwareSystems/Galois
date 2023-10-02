@@ -1,5 +1,5 @@
-//TODO(hc): Upgrade copyright if it is necessary; for now, we have no plan
-// to make this public.
+// TODO(hc): Upgrade copyright if it is necessary; for now, we have no plan
+//  to make this public.
 
 //===------------------------------------------------------------*- C++ -*-===//
 //
@@ -50,7 +50,7 @@
 #include "DataTypes.h"
 #include "GraphTypes.h"
 
-#define UINT   shad::data_types::UINT
+#define UINT shad::data_types::UINT
 #define DOUBLE shad::data_types::DOUBLE
 #define USDATE shad::data_types::USDATE
 #define ENCODE shad::data_types::encode
@@ -58,112 +58,120 @@
 namespace shad {
 
 class Vertex {
-  public:
-    // Vertex id; initially it is set
-    // to a local node id while CuSP reads a file and constructs
-    // this vertex. After each host finishes and synchronizes it to construct
-    // a full CSR graph, it is updated to a global node id.
-    uint64_t id;
-    TYPES    type;
-    uint64_t shadKey;
-    // Number of edges.
-    // This is incremented while reads a graph.
-    uint64_t numEdges{0};
+public:
+  // Vertex id; initially it is set
+  // to a local node id while CuSP reads a file and constructs
+  // this vertex. After each host finishes and synchronizes it to construct
+  // a full CSR graph, it is updated to a global node id.
+  uint64_t id;
+  TYPES type;
+  uint64_t shadKey;
+  // Number of edges.
+  // This is incremented while reads a graph.
+  uint64_t numEdges{0};
 
-    Vertex () {
-      this->id    = shad::data_types::kNullValue<uint64_t>;
-      this->type  = TYPES::NONE;
-      this->shadKey = shad::data_types::kNullValue<uint64_t>;
-    }
+  Vertex() {
+    this->id      = shad::data_types::kNullValue<uint64_t>;
+    this->type    = TYPES::NONE;
+    this->shadKey = shad::data_types::kNullValue<uint64_t>;
+  }
 
-    Vertex (uint64_t id_, TYPES type_, uint64_t shadKey_) {
-      this->id    = id_;
-      this->type  = type_;
-      this->shadKey = shadKey_;
-    }
+  Vertex(uint64_t id_, TYPES type_, uint64_t shadKey_) {
+    this->id      = id_;
+    this->type    = type_;
+    this->shadKey = shadKey_;
+  }
 
-    void incrNumEdges() {
-      this->numEdges += 1;
-    }
+  void incrNumEdges() { this->numEdges += 1; }
 
-    uint64_t getNumEdges() {
-      return this->numEdges;
-    }
+  uint64_t getNumEdges() { return this->numEdges; }
 };
 
 class Edge {
-  public:
-    uint64_t src;     // vertex id of src
-    uint64_t dst;     // vertex id of dst
-    TYPES    type;
-    TYPES    src_type;
-    TYPES    dst_type;
-    uint64_t src_glbid;
-    uint64_t dst_glbid;
+public:
+  uint64_t src; // vertex id of src
+  uint64_t dst; // vertex id of dst
+  TYPES type;
+  TYPES src_type;
+  TYPES dst_type;
+  uint64_t src_glbid;
+  uint64_t dst_glbid;
 
-    Edge () {
-      src       = shad::data_types::kNullValue<uint64_t>;
-      dst       = shad::data_types::kNullValue<uint64_t>;
-      type      = TYPES::NONE;
-      src_type  = TYPES::NONE;
-      dst_type  = TYPES::NONE;
+  Edge() {
+    src       = shad::data_types::kNullValue<uint64_t>;
+    dst       = shad::data_types::kNullValue<uint64_t>;
+    type      = TYPES::NONE;
+    src_type  = TYPES::NONE;
+    dst_type  = TYPES::NONE;
+    src_glbid = shad::data_types::kNullValue<uint64_t>;
+    dst_glbid = shad::data_types::kNullValue<uint64_t>;
+  }
+
+  Edge(std::vector<std::string>& tokens) {
+    if (tokens[0] == "Sale") {
+      src       = ENCODE<uint64_t, std::string, UINT>(tokens[1]);
+      dst       = ENCODE<uint64_t, std::string, UINT>(tokens[2]);
+      type      = TYPES::SALE;
+      src_type  = TYPES::PERSON;
+      dst_type  = TYPES::PERSON;
+      src_glbid = shad::data_types::kNullValue<uint64_t>;
+      dst_glbid = shad::data_types::kNullValue<uint64_t>;
+    } else if (tokens[0] == "Author") {
+      src       = ENCODE<uint64_t, std::string, UINT>(tokens[1]);
+      type      = TYPES::AUTHOR;
+      src_type  = TYPES::PERSON;
+      src_glbid = shad::data_types::kNullValue<uint64_t>;
+      dst_glbid = shad::data_types::kNullValue<uint64_t>;
+      if (tokens[3] != "")
+        dst = ENCODE<uint64_t, std::string, UINT>(tokens[3]);
+      else if (tokens[4] != "")
+        dst = ENCODE<uint64_t, std::string, UINT>(tokens[4]);
+      else if (tokens[5] != "")
+        dst = ENCODE<uint64_t, std::string, UINT>(tokens[5]);
+      if (tokens[3] != "")
+        dst_type = TYPES::FORUM;
+      else if (tokens[4] != "")
+        dst_type = TYPES::FORUMEVENT;
+      else if (tokens[5] != "")
+        dst_type = TYPES::PUBLICATION;
+    } else if (tokens[0] == "Includes") {
+      src       = ENCODE<uint64_t, std::string, UINT>(tokens[3]);
+      dst       = ENCODE<uint64_t, std::string, UINT>(tokens[4]);
+      type      = TYPES::INCLUDES;
+      src_type  = TYPES::FORUM;
+      dst_type  = TYPES::FORUMEVENT;
+      src_glbid = shad::data_types::kNullValue<uint64_t>;
+      dst_glbid = shad::data_types::kNullValue<uint64_t>;
+    } else if (tokens[0] == "HasTopic") {
+      dst       = ENCODE<uint64_t, std::string, UINT>(tokens[6]);
+      type      = TYPES::HASTOPIC;
+      dst_type  = TYPES::TOPIC;
+      src_glbid = shad::data_types::kNullValue<uint64_t>;
+      dst_glbid = shad::data_types::kNullValue<uint64_t>;
+      if (tokens[3] != "")
+        src = ENCODE<uint64_t, std::string, UINT>(tokens[3]);
+      else if (tokens[4] != "")
+        src = ENCODE<uint64_t, std::string, UINT>(tokens[4]);
+      else if (tokens[5] != "")
+        src = ENCODE<uint64_t, std::string, UINT>(tokens[5]);
+      if (tokens[3] != "")
+        src_type = TYPES::FORUM;
+      else if (tokens[4] != "")
+        src_type = TYPES::FORUMEVENT;
+      else if (tokens[5] != "")
+        src_type = TYPES::PUBLICATION;
+    } else if (tokens[0] == "HasOrg") {
+      src       = ENCODE<uint64_t, std::string, UINT>(tokens[5]);
+      dst       = ENCODE<uint64_t, std::string, UINT>(tokens[6]);
+      type      = TYPES::HASORG;
+      src_type  = TYPES::PUBLICATION;
+      dst_type  = TYPES::TOPIC;
       src_glbid = shad::data_types::kNullValue<uint64_t>;
       dst_glbid = shad::data_types::kNullValue<uint64_t>;
     }
-
-    Edge (std::vector <std::string> & tokens) {
-      if (tokens[0] == "Sale") {
-         src       = ENCODE<uint64_t, std::string, UINT>(tokens[1]);
-         dst       = ENCODE<uint64_t, std::string, UINT>(tokens[2]);
-         type      = TYPES::SALE;
-         src_type  = TYPES::PERSON;
-         dst_type  = TYPES::PERSON;
-         src_glbid = shad::data_types::kNullValue<uint64_t>;
-         dst_glbid = shad::data_types::kNullValue<uint64_t>;
-      } else if (tokens[0] == "Author") {
-         src  = ENCODE<uint64_t, std::string, UINT>(tokens[1]);
-         type      = TYPES::AUTHOR;
-         src_type  = TYPES::PERSON;
-         src_glbid = shad::data_types::kNullValue<uint64_t>;
-         dst_glbid = shad::data_types::kNullValue<uint64_t>;
-         if      (tokens[3] != "") dst = ENCODE<uint64_t, std::string, UINT>(tokens[3]);
-         else if (tokens[4] != "") dst = ENCODE<uint64_t, std::string, UINT>(tokens[4]);
-         else if (tokens[5] != "") dst = ENCODE<uint64_t, std::string, UINT>(tokens[5]);
-         if      (tokens[3] != "") dst_type = TYPES::FORUM;
-         else if (tokens[4] != "") dst_type = TYPES::FORUMEVENT;
-         else if (tokens[5] != "") dst_type = TYPES::PUBLICATION;
-      } else if (tokens[0] == "Includes") {
-         src       = ENCODE<uint64_t, std::string, UINT>(tokens[3]);
-         dst       = ENCODE<uint64_t, std::string, UINT>(tokens[4]);
-         type      = TYPES::INCLUDES;
-         src_type  = TYPES::FORUM;
-         dst_type  = TYPES::FORUMEVENT;
-         src_glbid = shad::data_types::kNullValue<uint64_t>;
-         dst_glbid = shad::data_types::kNullValue<uint64_t>;
-      } else if (tokens[0] == "HasTopic") {
-         dst       = ENCODE<uint64_t, std::string, UINT>(tokens[6]);
-         type      = TYPES::HASTOPIC;
-         dst_type  = TYPES::TOPIC;
-         src_glbid = shad::data_types::kNullValue<uint64_t>;
-         dst_glbid = shad::data_types::kNullValue<uint64_t>;
-         if      (tokens[3] != "") src = ENCODE<uint64_t, std::string, UINT>(tokens[3]);
-         else if (tokens[4] != "") src = ENCODE<uint64_t, std::string, UINT>(tokens[4]);
-         else if (tokens[5] != "") src = ENCODE<uint64_t, std::string, UINT>(tokens[5]);
-         if      (tokens[3] != "") src_type = TYPES::FORUM;
-         else if (tokens[4] != "") src_type = TYPES::FORUMEVENT;
-         else if (tokens[5] != "") src_type = TYPES::PUBLICATION;
-      } else if (tokens[0] == "HasOrg") {
-         src       = ENCODE<uint64_t, std::string, UINT>(tokens[5]);
-         dst       = ENCODE<uint64_t, std::string, UINT>(tokens[6]);
-         type      = TYPES::HASORG;
-         src_type  = TYPES::PUBLICATION;
-         dst_type  = TYPES::TOPIC;
-         src_glbid = shad::data_types::kNullValue<uint64_t>;
-         dst_glbid = shad::data_types::kNullValue<uint64_t>;
-      }
-    }
+  }
 };
 
-} // namespace agile::workflow1
+} // namespace shad
 
 #endif // GRAPH_H

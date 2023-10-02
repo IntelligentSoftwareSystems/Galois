@@ -56,7 +56,7 @@ void graph_conv_layer::malloc_and_init() {
 
   // make sure seed consistent across all hosts for weight matrix
   rand_init_matrix(y, z, W, 1);
-  //rand_init_matrix(y, z, Q, 1); // for GraphSAGE
+  // rand_init_matrix(y, z, Q, 1); // for GraphSAGE
 
   zero_init_matrix(y, z, layer::weight_grad);
 
@@ -64,12 +64,12 @@ void graph_conv_layer::malloc_and_init() {
   // alpha is only used for GAT
   rand_init_matrix(z, 1, alpha_l, 1);
   rand_init_matrix(z, 1, alpha_r, 1);
-  alpha_lgrad.resize(2*z);
-  alpha_rgrad.resize(2*z);
+  alpha_lgrad.resize(2 * z);
+  alpha_rgrad.resize(2 * z);
   std::fill(alpha_lgrad.begin(), alpha_lgrad.end(), 0);
   std::fill(alpha_rgrad.begin(), alpha_rgrad.end(), 0);
   auto ne = graph_cpu->sizeEdges(); // number of edges
-  scores.resize(ne); // a score for each edge
+  scores.resize(ne);                // a score for each edge
   temp_scores.resize(ne);
   scores_grad.resize(ne);
   norm_scores.resize(ne);
@@ -77,7 +77,7 @@ void graph_conv_layer::malloc_and_init() {
   epsilon = 0.2; // LeakyReLU angle of negative slope
 #endif
   dropout_ = true;
-  act_ = false;
+  act_     = false;
 
   if (dropout_)
     dropout_mask = new mask_t[x * y];
@@ -233,7 +233,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
     // at this point, out_temp has the derivative of data from last step to
     // use for both updating gradients for features and gradients for weights
     // this calculates gradients for the node predictions
-    if (level_ != 0) {// no need to calculate in_grad for the first layer
+    if (level_ != 0) { // no need to calculate in_grad for the first layer
       // derivative of matmul needs transposed matrix
       math::sgemm_cpu(CblasNoTrans, CblasTrans, x, y, z, 1.0, out_temp, &W[0],
                       0.0, in_grad); // x*z; z*y -> x*y
@@ -254,7 +254,7 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   compute_timer.stop();
 
   // sync agg
-  //galois::gPrint(header, "x is ", x, " y is ", y,  " z is ", z, "\n");
+  // galois::gPrint(header, "x is ", x, " y is ", y,  " z is ", z, "\n");
   if (level_ != 0) {
     deepgalois::_syncVectorSize = y;
     deepgalois::_dataToSync     = in_grad;
@@ -275,14 +275,13 @@ void graph_conv_layer::back_propagation(const float_t* in_data,
   unsigned host_num = galois::runtime::getSystemNetworkInterface().Num;
   layer::syncSub->sync<writeAny, readAny, GradientSync>("Gradients");
   galois::do_all(
-    galois::iterate((size_t)0, (size_t)z),
-    [&] (size_t i) {
-      //galois::gPrint("before ", i, " ", layer::weight_grad[i], "\n");
-      layer::weight_grad[i] /= host_num;
-      //galois::gPrint("after ", i, " ", layer::weight_grad[i], "\n");
-    },
-    galois::loopname("sync post process")
-  );
+      galois::iterate((size_t)0, (size_t)z),
+      [&](size_t i) {
+        // galois::gPrint("before ", i, " ", layer::weight_grad[i], "\n");
+        layer::weight_grad[i] /= host_num;
+        // galois::gPrint("after ", i, " ", layer::weight_grad[i], "\n");
+      },
+      galois::loopname("sync post process"));
 
   galois::gDebug("[", layer::gradientGraph->myHostID(), "] Sync done");
   conv_timer.stop();

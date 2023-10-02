@@ -91,7 +91,7 @@ code has to occur before backward is called).
 
 Regarding the backward step: it turns out that for single class
 classification, the gradient if the answer is wrong is simply
-the softmax value itself, and if the answer is right, then its 
+the softmax value itself, and if the answer is right, then its
 the softmax value - 1. This has the advantage of being very
 numerically stable as well.
 
@@ -106,7 +106,7 @@ ReLU activation is used by the compute layers: if the value
 is greater than 0, it is kept, else it is discarded.
 
 Because the forward output matrix gets overwritten during
-the backward step and because the derivative of the 
+the backward step and because the derivative of the
 ReLU operation requires knowledge of what elements were
 affected by the ReLU, the system must *track* which
 elements were not set to 0 using a bitmask. This
@@ -151,7 +151,7 @@ the length of the vector. Actually doing this in the feature
 matrix is not great as it would mean that the original weight
 matrix needs to double in size, and additional space would have
 to be allocated on top of the existing input features
-with the aggregated copied over to it. 
+with the aggregated copied over to it.
 
 Instead of doing this, you can allocate a separate weight matrix
 of the same size as the original, multiply the original input
@@ -187,7 +187,7 @@ after aggregation, the rows of the matrix go from IR to OR.
 Therefore, after linear xform, IC turns to OC.
 
 After both operations, the output matrix to the next layer is the
-expected OR by OC. Depending on which one occurs first, 
+expected OR by OC. Depending on which one occurs first,
 the code generates an intermediate of OR by IC *or* IC by OC.
 (more than one may be needed if dropout is used as that generates
 a new dropout matrix).
@@ -370,7 +370,7 @@ The way this works is relatively simple: the code loops
 through each layer and calls the forward or backward pass function
 on it.
 
-Depending on how the test interval is set, between each epoch 
+Depending on how the test interval is set, between each epoch
 a test subgraph may be used to check test accuracy.
 The flaw with the current design is that the graph object is
 only aware of one 'graph' at any one point, meaning the code
@@ -382,7 +382,7 @@ a status that is set on nodes based on the minibatch and only
 includes *local seed nodes*, so keep this in mind when using it (there
 have been unintentional problems where I assumed `kBatch` meant
 more than just local seed nodes). The main reason for this is
-that it helps to distinguish local and global seed nodes to avoid 
+that it helps to distinguish local and global seed nodes to avoid
 over-calculating gradients.
 
 # GNN Graph
@@ -450,7 +450,7 @@ to keep things correct.
 In addition, the degree of a node for each sampled phase locally
 is kept track of. At the end of all sampling, the degrees
 of the nodes at each layer are synchronized among all hosts.
-This is required because normalization in aggregation uses 
+This is required because normalization in aggregation uses
 the subgraph degrees (this is actually quite annoying runtime
 wise as it adds this extra degree sync step).
 
@@ -465,7 +465,7 @@ the CSR; this includes edges that may not always be active.
 4) Create the local subgraph features matrix by copying
 them over from the original feature matrix.
 
-In order to make row elimination easier, 
+In order to make row elimination easier,
 the SID of the vertices are ordered such that seed nodes are
 first, the 1-hop samples next, then 2-hops, 3-hops, etc.
 This makes it easy to eliminate vertices that aren't used after

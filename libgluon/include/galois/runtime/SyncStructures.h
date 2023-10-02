@@ -1988,7 +1988,7 @@ public:
   template <typename NTy>                                                      \
   struct GNNSumAggregate_##fieldname {                                         \
     using NodeTy = NTy;                                                        \
-    using ValTy = GNNFloat;                                                    \
+    using ValTy  = GNNFloat;                                                   \
                                                                                \
     static ValTy extract(uint32_t, NodeTy&) { return 0.f; }                    \
                                                                                \

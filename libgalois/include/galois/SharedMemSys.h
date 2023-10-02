@@ -16,10 +16,10 @@ public:
   explicit SharedMemSys();
   ~SharedMemSys();
 
-  SharedMemSys(const SharedMemSys&) = delete;
+  SharedMemSys(const SharedMemSys&)            = delete;
   SharedMemSys& operator=(const SharedMemSys&) = delete;
 
-  SharedMemSys(SharedMemSys&&) = delete;
+  SharedMemSys(SharedMemSys&&)            = delete;
   SharedMemSys& operator=(SharedMemSys&&) = delete;
 };
 

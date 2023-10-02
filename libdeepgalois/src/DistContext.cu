@@ -64,9 +64,9 @@ cusparseMatDescr_t DistContext::cusparse_matdescr_ = 0;
 curandGenerator_t DistContext::curand_generator_   = 0;
 
 DistContext::DistContext() : DistContext(true) {
-  d_labels = NULL; 
+  d_labels = NULL;
   d_feats = NULL;
-  d_labels_subg = NULL; 
+  d_labels_subg = NULL;
   d_feats_subg = NULL;
   d_normFactors = NULL;
   d_normFactorsSub = NULL;
@@ -110,7 +110,7 @@ size_t DistContext::read_features(std::string dataset_str) {
   return feat_len;
 }
 
-size_t DistContext::read_masks(std::string dataset_str, std::string mask_type, size_t n, 
+size_t DistContext::read_masks(std::string dataset_str, std::string mask_type, size_t n,
                                size_t& begin, size_t& end, mask_t* masks, DGraph* dGraph) {
   return reader.read_masks(mask_type, n, begin, end, masks);
 }
@@ -132,7 +132,7 @@ void DistContext::constructSubgraphLabels(size_t m, const mask_t* masks) {
   for (size_t i = 0; i < this->partitionedGraph->size(); i++) {
     if (masks[i] == 1) {
       if (usingSingleClass) h_labels_subg[count] = h_labels[i];
-      else std::copy(h_labels + i * num_classes, h_labels + (i + 1) * num_classes, 
+      else std::copy(h_labels + i * num_classes, h_labels + (i + 1) * num_classes,
                      &h_labels_subg[count * num_classes]);
       count++;
     }

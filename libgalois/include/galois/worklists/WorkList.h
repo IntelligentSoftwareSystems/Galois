@@ -56,7 +56,7 @@ namespace { // don't pollute the symbol table with the example
 // All classes (should) conform to:
 template <typename T>
 class AbstractWorkList {
-  AbstractWorkList(const AbstractWorkList&) = delete;
+  AbstractWorkList(const AbstractWorkList&)                  = delete;
   const AbstractWorkList& operator=(const AbstractWorkList&) = delete;
 
 public:

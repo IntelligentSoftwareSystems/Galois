@@ -49,10 +49,10 @@ public:
   PerThreadTimer(const char* const region, const char* const category)
       : region_(region), category_(category) {}
 
-  PerThreadTimer(const PerThreadTimer&) = delete;
-  PerThreadTimer(PerThreadTimer&&)      = delete;
+  PerThreadTimer(const PerThreadTimer&)            = delete;
+  PerThreadTimer(PerThreadTimer&&)                 = delete;
   PerThreadTimer& operator=(const PerThreadTimer&) = delete;
-  PerThreadTimer& operator=(PerThreadTimer&&) = delete;
+  PerThreadTimer& operator=(PerThreadTimer&&)      = delete;
 
   ~PerThreadTimer() { reportTimes(); }
 
@@ -67,10 +67,10 @@ class PerThreadTimer<false> {
 public:
   PerThreadTimer(const char* const, const char* const) {}
 
-  PerThreadTimer(const PerThreadTimer&) = delete;
-  PerThreadTimer(PerThreadTimer&&)      = delete;
+  PerThreadTimer(const PerThreadTimer&)            = delete;
+  PerThreadTimer(PerThreadTimer&&)                 = delete;
   PerThreadTimer& operator=(const PerThreadTimer&) = delete;
-  PerThreadTimer& operator=(PerThreadTimer&&) = delete;
+  PerThreadTimer& operator=(PerThreadTimer&&)      = delete;
 
   ~PerThreadTimer() = default;
 

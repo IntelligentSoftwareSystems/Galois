@@ -21,12 +21,12 @@
 
 #include "galois/Galois.h"
 #include "galois/graphs/CuSPPartitioner.h"
-#include "shad/ShadGraphConverter.h" 
+#include "shad/ShadGraphConverter.h"
 
 int main() {
   galois::DistMemSys G;
   unsigned M = galois::substrate::getThreadPool().getMaxThreads();
-  //M = 1;
+  // M = 1;
   galois::setActiveThreads(M);
 
   shad::ShadGraphConverter shadConverter;
@@ -38,7 +38,8 @@ int main() {
   std::string filename = "/home/hochan/data.01.csv";
   shadConverter.readSHADFile(filename, &numNodes, &numEdges);
   std::unique_ptr<galois::graphs::DistGraph<shad::ShadNodeTy, shad::ShadEdgeTy>>
-      graph = galois::cuspPartitionGraph<GenericCVC, shad::ShadNodeTy, shad::ShadEdgeTy>(
+      graph = galois::cuspPartitionGraph<GenericCVC, shad::ShadNodeTy,
+                                         shad::ShadEdgeTy>(
           filename, galois::CUSP_CSR, galois::CUSP_CSR, true, true);
 
   std::cout << "Test starts...\n";
@@ -62,31 +63,34 @@ int main() {
 
   std::cout << "Num. nodes/edges tests has been passed\n";
 
-  uint32_t id = galois::runtime::getSystemNetworkInterface().ID;
+  uint32_t id       = galois::runtime::getSystemNetworkInterface().ID;
   uint32_t numHosts = galois::runtime::getSystemNetworkInterface().Num;
   {
-  std::ofstream fp(std::to_string(id) + ".master");
-  for (uint32_t src = 0; src < graph->numMasters(); ++src) {
-    uint64_t srcglobal = graph->getGID(src);
-    fp << "node " << srcglobal << ", type: " << graph->getData(src).type << 
-      ", key: " << graph->getData(src).key << "\n";
-    for (auto e : graph->edges(src)) {
-      uint32_t dstlocal = graph->getEdgeDst(e);
-      uint64_t dstglobal = graph->getGID(dstlocal);
-      fp << "\t edge dst " << dstglobal << ", type: " <<
-          graph->getEdgeData(e) << "\n";
+    std::ofstream fp(std::to_string(id) + ".master");
+    for (uint32_t src = 0; src < graph->numMasters(); ++src) {
+      uint64_t srcglobal = graph->getGID(src);
+      fp << "node " << srcglobal << ", type: " << graph->getData(src).type
+         << ", key: " << graph->getData(src).key << "\n";
+      for (auto e : graph->edges(src)) {
+        uint32_t dstlocal  = graph->getEdgeDst(e);
+        uint64_t dstglobal = graph->getGID(dstlocal);
+        fp << "\t edge dst " << dstglobal << ", type: " << graph->getEdgeData(e)
+           << "\n";
+      }
     }
-  }
-  fp.close();
+    fp.close();
   }
 
   {
     for (uint32_t host = 0; host < numHosts; ++host) {
-      if (host == id) { continue; }
-      std::ofstream fp(std::to_string(id) + "-" + std::to_string(host) + ".graph");
+      if (host == id) {
+        continue;
+      }
+      std::ofstream fp(std::to_string(id) + "-" + std::to_string(host) +
+                       ".graph");
       for (uint32_t i = 0; i < graph->size(); ++i) {
-        fp << i << ", " << graph->getGID(i) << ", " <<
-          graph->getData(i).type << ", " << graph->getData(i).key << "\n";
+        fp << i << ", " << graph->getGID(i) << ", " << graph->getData(i).type
+           << ", " << graph->getData(i).key << "\n";
       }
       fp.close();
     }

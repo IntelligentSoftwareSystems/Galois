@@ -55,8 +55,7 @@ public:
   GNNGraph(const std::string& dataset_name, GNNPartitionScheme partition_scheme,
            bool has_single_class_label, bool useWMD = false)
       : GNNGraph(galois::default_gnn_dataset_path, dataset_name,
-                 partition_scheme, has_single_class_label,
-                 useWMD) {}
+                 partition_scheme, has_single_class_label, useWMD) {}
 
   //! Loads a graph and all relevant metadata (labels, features, masks, etc.)
   GNNGraph(const std::string& input_directory, const std::string& dataset_name,
@@ -72,8 +71,8 @@ public:
         std::to_string(galois::runtime::getSystemNetworkInterface().ID) +
         std::string("] ");
     // load partition
-    partitioned_graph_ = LoadPartition(input_directory_, dataset_name,
-                                       partition_scheme, useWMD);
+    partitioned_graph_ =
+        LoadPartition(input_directory_, dataset_name, partition_scheme, useWMD);
     galois::gInfo(host_prefix_, "Loading partition is completed");
     // reverse edges
     partitioned_graph_->ConstructIncomingEdges();
@@ -918,9 +917,9 @@ public:
     }
   }
 
-  template <
-      typename T                                                      = VTy,
-      typename std::enable_if_t<!std::is_same_v<T, shad::ShadNodeTy>>* = nullptr>
+  template <typename T = VTy,
+            typename std::enable_if_t<!std::is_same_v<T, shad::ShadNodeTy>>* =
+                nullptr>
   void ConstructFeatureBy2HopAggregation() {}
 
   void ConstructFeatureBy2HopAggregationGPU() {
@@ -934,11 +933,11 @@ public:
   void ConstructFeatureBy2HopAggregationCPU() {
     galois::gInfo("Construct an initial feature on CPU by "
                   "aggregating and concatenating neighbors' features.");
-    //this->PrintFeatures("0hop");
-    // this->FillTestNodeType();
-    //this->PrintGraphTopo("before");
+    // this->PrintFeatures("0hop");
+    //  this->FillTestNodeType();
+    // this->PrintGraphTopo("before");
     this->Construct1HopFeatureCPU();
-    //this->PrintFeatures("1hop");
+    // this->PrintFeatures("1hop");
     this->Construct2HopFeatureCPU();
     this->PrintFeatures("2hop");
   }
@@ -1008,7 +1007,6 @@ public:
                                    Bitset_graph_aggregate>(
         "GraphAggregateSync");
   }
-
 
   /// Construct feature from 2-hop neighbors.
   /// After `Construct1HopFeatureCPU()`, each vertex aggregates types of
@@ -1089,9 +1087,9 @@ public:
    * For now, I stopped this analysis and
    * just enabled this method for only GCN without graph
    * sampling. With graph sampling, I used SAGE's graph normalization.
-   */ 
+   */
   GNNFloat GetGCNNormFactor(GraphNode lid
-      /*, size_t graph_user_layer_num*/) const {
+                            /*, size_t graph_user_layer_num*/) const {
 #if 0
     if (use_subgraph_ || use_subgraph_view_) {
       size_t degree;
@@ -1283,7 +1281,7 @@ public:
   //! that follows SHAD GNN feature construction. This aggregates features of
   //! the neighbor vertices that are from (vertex's feature offset +
   //! 1/2 * feature length) to (vertex's feature offset + feature length),
-  //! to (vertex's feature offset) of the current vertex, from its proxies. 
+  //! to (vertex's feature offset) of the current vertex, from its proxies.
   //!
   //! @param matrix_to_sync Float pointer pointing to features of the target
   //! vertex
@@ -1296,13 +1294,13 @@ public:
 
     // set globals for the sync substrate
     if (use_timer_) {
-      sync_substrate_->template sync<
-          writeSource, readAny, SHADGNNSumAggregate<VTy>, Bitset_graph_aggregate>(
-          "SHADGraphAggregateSync");
+      sync_substrate_
+          ->template sync<writeSource, readAny, SHADGNNSumAggregate<VTy>,
+                          Bitset_graph_aggregate>("SHADGraphAggregateSync");
     } else {
-      sync_substrate_->template sync<
-          writeSource, readAny, SHADGNNSumAggregate<VTy>, Bitset_graph_aggregate>(
-          "Ignore");
+      sync_substrate_
+          ->template sync<writeSource, readAny, SHADGNNSumAggregate<VTy>,
+                          Bitset_graph_aggregate>("Ignore");
     }
   }
 
@@ -1682,18 +1680,16 @@ private:
     // is better
     std::mutex label_class_set_mtx;
     std::unordered_set<int> label_class_set;
-    galois::do_all(
-        galois::iterate(size_t{0}, graph.size()),
-        [&](size_t lid) {
-          local_ground_truth_labels_[lid] = graph.getData(lid).type;
-          label_class_set_mtx.lock();
-          auto found = label_class_set.find(local_ground_truth_labels_[lid]);
-          if (found == label_class_set.end()) {
-            label_class_set.emplace(local_ground_truth_labels_[lid]);
-            ++num_label_classes_;
-          }
-          label_class_set_mtx.unlock();
-        });
+    galois::do_all(galois::iterate(size_t{0}, graph.size()), [&](size_t lid) {
+      local_ground_truth_labels_[lid] = graph.getData(lid).type;
+      label_class_set_mtx.lock();
+      auto found = label_class_set.find(local_ground_truth_labels_[lid]);
+      if (found == label_class_set.end()) {
+        label_class_set.emplace(local_ground_truth_labels_[lid]);
+        ++num_label_classes_;
+      }
+      label_class_set_mtx.unlock();
+    });
 
     // Exchange found local vertex classes with other hosts to
     // calculate the total number of the classes.
@@ -1703,9 +1699,11 @@ private:
     // support std::set and std::unordered_set de/serialization.
     // TODO(hc): support this type of serialization.
     std::vector<int> label_vec(label_class_set.begin(), label_class_set.end());
-    auto &net = galois::runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     for (uint32_t h = 0; h < net.Num; ++h) {
-      if (h == net.ID) { continue; }
+      if (h == net.ID) {
+        continue;
+      }
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, label_vec);
       net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
@@ -1719,25 +1717,24 @@ private:
 
       std::vector<int> h_label_vec;
       galois::runtime::gDeserialize(p->second, h_label_vec);
-      galois::do_all(galois::iterate(h_label_vec),
-          [&](int i) {
-            label_class_set_mtx.lock();
-            auto found = label_class_set.find(i);
-            if (found == label_class_set.end()) {
-              label_class_set.emplace(i);
-              // Increaes the number of classes only if
-              // it was not found in the local host.
-              ++num_label_classes_;
-            }
-            label_class_set_mtx.unlock();
-          } );
+      galois::do_all(galois::iterate(h_label_vec), [&](int i) {
+        label_class_set_mtx.lock();
+        auto found = label_class_set.find(i);
+        if (found == label_class_set.end()) {
+          label_class_set.emplace(i);
+          // Increaes the number of classes only if
+          // it was not found in the local host.
+          ++num_label_classes_;
+        }
+        label_class_set_mtx.unlock();
+      });
     }
     increment_evilPhase();
   }
 
-  template <
-      typename T                                                      = VTy,
-      typename std::enable_if_t<!std::is_same_v<T, shad::ShadNodeTy>>* = nullptr>
+  template <typename T = VTy,
+            typename std::enable_if_t<!std::is_same_v<T, shad::ShadNodeTy>>* =
+                nullptr>
   void ConstructLocalLabels() {}
 
   void ReadLocalLabelsBin(const std::string& dataset_name) {
@@ -2024,7 +2021,7 @@ private:
     return other_accum.reduce();
   }
 
-  //! @brief Choose and set local training/validation/testing vertices 
+  //! @brief Choose and set local training/validation/testing vertices
   //! consecutively.
   void SetLocalMasksConsecutively() {
     // allocate the memory for the local masks
@@ -2033,20 +2030,19 @@ private:
     local_validation_mask_.resize(partitioned_graph_->size());
     local_testing_mask_.resize(partitioned_graph_->size());
 
-    global_training_count_ = partitioned_graph_->globalSize() / 4;
-    size_t global_testing_count = global_training_count_ / 2;
-    global_training_mask_range_ = {
-        .begin = 0, .end = global_training_count_, .size = global_training_count_};
-    global_testing_mask_range_ = {
-        .begin = global_training_count_,
-        .end = global_training_count_ + global_testing_count,
-        .size = global_testing_count
-    };
+    global_training_count_        = partitioned_graph_->globalSize() / 4;
+    size_t global_testing_count   = global_training_count_ / 2;
+    global_training_mask_range_   = {.begin = 0,
+                                     .end   = global_training_count_,
+                                     .size  = global_training_count_};
+    global_testing_mask_range_    = {.begin = global_training_count_,
+                                     .end   = global_training_count_ +
+                                            global_testing_count,
+                                     .size = global_testing_count};
     global_validation_mask_range_ = {
         .begin = global_training_count_ + global_testing_count,
-        .end = global_training_count_ + 2 * global_testing_count,
-        .size = global_testing_count
-    };
+        .end   = global_training_count_ + 2 * global_testing_count,
+        .size  = global_testing_count};
     // training
     for (size_t i = global_training_mask_range_.begin;
          i < global_training_mask_range_.end; i++) {
@@ -2076,8 +2072,8 @@ private:
   //! @brief Randomly choose and set local training/validation/testing
   //! vertices. This mimics what AGILE GNN does through Pytorch
   //! `DistributedRandomSampler`.
-  void DistributedRandomSampling(
-      size_t local_sample_size, std::vector<char>* masks) {
+  void DistributedRandomSampling(size_t local_sample_size,
+                                 std::vector<char>* masks) {
     // Pytorch's DistributedRandomSampler,
     // first materializes an array populated with
     // 0 to (num_local_vertices - 1), shuffles this array, and
@@ -2088,15 +2084,16 @@ private:
     // the current host, but also others, and mark vertices to
     // the corresponding mask array if they are locals.
     auto& net = galois::runtime::getSystemNetworkInterface();
-    std::vector<
-        std::pair<uint64_t, uint64_t>> num_masters_per_hosts(net.Num);
-    std::pair<uint64_t, uint64_t> master_ranges =
-        { partitioned_graph_->getGID(0),
-          partitioned_graph_->getGID(partitioned_graph_->numMasters() - 1) };
+    std::vector<std::pair<uint64_t, uint64_t>> num_masters_per_hosts(net.Num);
+    std::pair<uint64_t, uint64_t> master_ranges = {
+        partitioned_graph_->getGID(0),
+        partitioned_graph_->getGID(partitioned_graph_->numMasters() - 1)};
     // 1) Exchange node master ranges, and so, each host knows
     // the range of vertex sampling.
     for (uint32_t h = 0; h < net.Num; ++h) {
-      if (h == net.ID) { continue; }
+      if (h == net.ID) {
+        continue;
+      }
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, master_ranges);
       net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
@@ -2108,34 +2105,32 @@ private:
         p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
 
-      galois::runtime::gDeserialize(p->second,
-          num_masters_per_hosts[p->first]);
+      galois::runtime::gDeserialize(p->second, num_masters_per_hosts[p->first]);
     }
     increment_evilPhase();
 
     // 2) Sample vertices and mark them to the `masks` array
     // if a vertex is local.
     for (uint32_t h = 0; h < net.Num; ++h) {
-      size_t h_begin = (h == net.ID)? master_ranges.first : num_masters_per_hosts[h].first;
-      size_t h_end = (h == net.ID)? master_ranges.second : num_masters_per_hosts[h].second;
+      size_t h_begin =
+          (h == net.ID) ? master_ranges.first : num_masters_per_hosts[h].first;
+      size_t h_end = (h == net.ID) ? master_ranges.second
+                                   : num_masters_per_hosts[h].second;
       std::vector<uint64_t> h_all_indices(h_end - h_begin);
       // Fill global vertex ids to h_global_ids.
       galois::do_all(galois::iterate(h_begin, h_end),
-          [&](size_t i) {
-            h_all_indices[i - h_begin] = i;
-          } );
+                     [&](size_t i) { h_all_indices[i - h_begin] = i; });
       std::mt19937 rand(0);
       std::shuffle(h_all_indices.begin(), h_all_indices.end(), rand);
       galois::do_all(
-          galois::iterate(size_t{0}, local_sample_size),
-          [&](size_t i) {
+          galois::iterate(size_t{0}, local_sample_size), [&](size_t i) {
             // First, it doens't have duplications.
             // Second, only mark `masks` if the checking vertex is a local
             // vertex.
             if (partitioned_graph_->isLocal(h_all_indices[i])) {
               (*masks)[partitioned_graph_->getLID(h_all_indices[i])] = 1;
             }
-          } );
+          });
     }
   }
 
@@ -2146,26 +2141,28 @@ private:
     local_validation_mask_.resize(partitioned_graph_->size());
     local_testing_mask_.resize(partitioned_graph_->size());
 
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    global_training_count_ = partitioned_graph_->globalSize() / 4;
+    auto& net                   = galois::runtime::getSystemNetworkInterface();
+    global_training_count_      = partitioned_graph_->globalSize() / 4;
     size_t global_testing_count = global_training_count_ / 2;
-    size_t num_local_training_samples = global_training_count_ / net.Num;
-    size_t num_local_testing_samples = global_testing_count / net.Num;
+    size_t num_local_training_samples   = global_training_count_ / net.Num;
+    size_t num_local_testing_samples    = global_testing_count / net.Num;
     size_t num_local_validating_samples = num_local_testing_samples;
-    global_training_mask_range_ = {
-        .begin = 0, .end = global_training_count_, .size = global_training_count_};
-    global_testing_mask_range_ = {
-        .begin = 0, .end = global_training_count_, .size = global_training_count_};
-    global_validation_mask_range_ = {
-        .begin = 0, .end = global_training_count_, .size = global_training_count_};
+    global_training_mask_range_         = {.begin = 0,
+                                           .end   = global_training_count_,
+                                           .size  = global_training_count_};
+    global_testing_mask_range_          = {.begin = 0,
+                                           .end   = global_training_count_,
+                                           .size  = global_training_count_};
+    global_validation_mask_range_       = {.begin = 0,
+                                           .end   = global_training_count_,
+                                           .size  = global_training_count_};
 
     incomplete_masks_ = true;
-    DistributedRandomSampling(
-        num_local_training_samples, &local_training_mask_);
-    DistributedRandomSampling(
-        num_local_testing_samples, &local_testing_mask_);
-    DistributedRandomSampling(
-        num_local_validating_samples, &local_validation_mask_);
+    DistributedRandomSampling(num_local_training_samples,
+                              &local_training_mask_);
+    DistributedRandomSampling(num_local_testing_samples, &local_testing_mask_);
+    DistributedRandomSampling(num_local_validating_samples,
+                              &local_validation_mask_);
   }
 
   //! Read masks of local nodes only for training, validation, and testing
@@ -2533,7 +2530,7 @@ private:
     ++galois::runtime::evilPhase;
     if (galois::runtime::evilPhase >=
         static_cast<uint32_t>(std::numeric_limits<int64_t>::max())) {
-      galois::runtime::evilPhase = 1; 
+      galois::runtime::evilPhase = 1;
     }
   }
 

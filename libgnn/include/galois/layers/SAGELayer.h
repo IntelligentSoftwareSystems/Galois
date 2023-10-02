@@ -585,11 +585,11 @@ private:
   static const constexpr char* kRegionName = "SAGELayer";
 
   //! CPU aggregation
-  void AggregateAllCPU(
-      size_t column_length, const GNNFloat* node_embeddings,
-      GNNFloat* aggregate_output,
-      galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
-      bool is_backward) {
+  void
+  AggregateAllCPU(size_t column_length, const GNNFloat* node_embeddings,
+                  GNNFloat* aggregate_output,
+                  galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
+                  bool is_backward) {
     // aggregation causes a row count change
     size_t num_rows_to_handle;
     if (!is_backward) {

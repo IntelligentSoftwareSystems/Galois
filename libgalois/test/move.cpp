@@ -26,17 +26,17 @@
 #include "galois/substrate/PerThreadStorage.h"
 
 struct MoveOnly {
-  MoveOnly()           = default;
-  MoveOnly(MoveOnly&&) = default;
-  MoveOnly& operator=(MoveOnly&&) = default;
-  MoveOnly(const MoveOnly&)       = delete;
+  MoveOnly()                           = default;
+  MoveOnly(MoveOnly&&)                 = default;
+  MoveOnly& operator=(MoveOnly&&)      = default;
+  MoveOnly(const MoveOnly&)            = delete;
   MoveOnly& operator=(const MoveOnly&) = delete;
 };
 
 struct MoveOnlyA {
   int* x;
   MoveOnlyA() {}
-  MoveOnlyA(const MoveOnlyA&) = delete;
+  MoveOnlyA(const MoveOnlyA&)           = delete;
   MoveOnly& operator=(const MoveOnlyA&) = delete;
   ~MoveOnlyA() {}
 };

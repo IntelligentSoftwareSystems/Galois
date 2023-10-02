@@ -46,10 +46,10 @@ public:
     internal::setPagePoolState(nullptr);
   }
 
-  SharedMem(const SharedMem&) = delete;
+  SharedMem(const SharedMem&)            = delete;
   SharedMem& operator=(const SharedMem&) = delete;
 
-  SharedMem(SharedMem&&) = delete;
+  SharedMem(SharedMem&&)            = delete;
   SharedMem& operator=(SharedMem&&) = delete;
 };
 

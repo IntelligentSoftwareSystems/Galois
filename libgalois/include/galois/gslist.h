@@ -174,7 +174,7 @@ public:
 
   gslist_base() : first(0) {}
 
-  gslist_base(const gslist_base&) = delete;
+  gslist_base(const gslist_base&)            = delete;
   gslist_base& operator=(const gslist_base&) = delete;
 
   gslist_base(gslist_base&& other) : first(0) { *this = std::move(other); }

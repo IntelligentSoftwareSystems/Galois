@@ -268,8 +268,7 @@ public:
                this->layer_dimensions_.input_rows *
                    this->layer_dimensions_.output_columns);
         // pintemp1 contains (AF)'
-        UpdateEmbeddingsDerivative(
-            input_gradient->data(), p_in_temp_1_.data());
+        UpdateEmbeddingsDerivative(input_gradient->data(), p_in_temp_1_.data());
         // pback contains F'
         // derivative of aggregate is the same due to symmetric graph
         AggregateAll(this->layer_dimensions_.input_columns, p_in_temp_1_.data(),
@@ -383,9 +382,8 @@ private:
                   galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
                   bool is_backward) {
     galois::StatTimer aggregate_all_sync_timer("AggregateSync", kRegionName);
-    size_t num_nodes   = (is_backward)?
-        this->layer_dimensions_.input_rows :
-        this->layer_dimensions_.output_rows;
+    size_t num_nodes   = (is_backward) ? this->layer_dimensions_.input_rows
+                                       : this->layer_dimensions_.output_rows;
     size_t last_master = *(this->graph_.end_owned());
 
     assert(0 == *(this->graph_.begin_owned()));
@@ -414,9 +412,8 @@ private:
           if (!this->config_.disable_normalization) {
             if (this->graph_.IsSubgraphOn() ||
                 this->graph_.IsSubgraphViewOn()) {
-              source_norm =
-                  this->graph_.GetDegreeNorm(
-                      src, this->graph_user_layer_number_);
+              source_norm = this->graph_.GetDegreeNorm(
+                  src, this->graph_user_layer_number_);
             } else {
               source_norm = this->graph_.GetGCNNormFactor(src);
             }
@@ -424,8 +421,7 @@ private:
 
           // init to self
           if (!this->config_.disable_self_aggregate) {
-            graphs::bitset_graph_aggregate.set(
-                this->graph_.ConvertToLID(src));
+            graphs::bitset_graph_aggregate.set(this->graph_.ConvertToLID(src));
             // only aggregate self once on master
             if (src < last_master) {
               for (size_t i = 0; i < column_length; i++) {
@@ -437,42 +433,40 @@ private:
           }
 
           // loop through all destinations to grab the feature to aggregate
-          auto e_beg = (is_backward)?
-              this->graph_.in_edge_begin(src) : this->graph_.edge_begin(src);
-          auto e_end = (is_backward)?
-              this->graph_.in_edge_end(src) : this->graph_.edge_end(src);
+          auto e_beg = (is_backward) ? this->graph_.in_edge_begin(src)
+                                     : this->graph_.edge_begin(src);
+          auto e_end = (is_backward) ? this->graph_.in_edge_end(src)
+                                     : this->graph_.edge_end(src);
           for (auto e = e_beg; e != e_end; e++) {
             if (this->layer_phase_ == GNNPhase::kTrain ||
                 this->layer_phase_ == GNNPhase::kBatch) {
               if (this->IsSampledLayer()) {
-                bool is_sampled = (is_backward)?
-                    this->graph_.IsInEdgeSampled(
-                        e, this->graph_user_layer_number_) :
-                    this->graph_.IsEdgeSampled(
-                        e, this->graph_user_layer_number_);
+                bool is_sampled = (is_backward)
+                                      ? this->graph_.IsInEdgeSampled(
+                                            e, this->graph_user_layer_number_)
+                                      : this->graph_.IsEdgeSampled(
+                                            e, this->graph_user_layer_number_);
                 // ignore non-sampled nodes and edges
                 if (!is_sampled) {
                   continue;
                 }
               }
             }
-            size_t dst = (is_backward)?
-                this->graph_.GetInEdgeDest(e) : this->graph_.GetEdgeDest(e);
-            graphs::bitset_graph_aggregate.set(
-                this->graph_.ConvertToLID(src));
+            size_t dst = (is_backward) ? this->graph_.GetInEdgeDest(e)
+                                       : this->graph_.GetEdgeDest(e);
+            graphs::bitset_graph_aggregate.set(this->graph_.ConvertToLID(src));
             size_t index_to_dst_feature = dst * column_length;
 
             if (!this->config_.disable_normalization) {
               GNNFloat norm_scale;
               if (this->graph_.IsSubgraphOn() ||
                   this->graph_.IsSubgraphViewOn()) {
-                norm_scale = (is_backward)?
-                    this->graph_.GetDegreeNorm(
-                        dst, this->graph_user_layer_number_)
-                    : source_norm;
+                norm_scale = (is_backward)
+                                 ? this->graph_.GetDegreeNorm(
+                                       dst, this->graph_user_layer_number_)
+                                 : source_norm;
               } else {
-                norm_scale =
-                    source_norm * this->graph_.GetGCNNormFactor(dst);
+                norm_scale = source_norm * this->graph_.GetGCNNormFactor(dst);
               }
 
               galois::VectorMulAdd(
@@ -492,8 +486,8 @@ private:
         galois::loopname("ConvolutionalAggregateAll"));
     // aggregate sync
     aggregate_all_sync_timer.start();
-    this->graph_.AggregateSync(aggregate_output, column_length,
-          is_backward, num_nodes);
+    this->graph_.AggregateSync(aggregate_output, column_length, is_backward,
+                               num_nodes);
     aggregate_all_sync_timer.stop();
   }
 
@@ -534,7 +528,7 @@ private:
     } else {
 #endif
       AggregateAllCPU(column_length, node_embeddings, aggregate_output, pts,
-          is_backward);
+                      is_backward);
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
@@ -560,8 +554,7 @@ private:
                          this->layer_dimensions_.input_rows,
                          this->layer_dimensions_.input_columns,
                          this->layer_dimensions_.output_columns,
-                         node_embeddings, this->layer_weights_.data(),
-                         output);
+                         node_embeddings, this->layer_weights_.data(), output);
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
@@ -569,8 +562,7 @@ private:
   }
 
   //! Calculate graident via mxm with last layer's gradients (backward)
-  void UpdateEmbeddingsDerivative(
-      const GNNFloat* gradients, GNNFloat* output) {
+  void UpdateEmbeddingsDerivative(const GNNFloat* gradients, GNNFloat* output) {
     galois::StatTimer timer("BackwardXform", kRegionName);
     timer.start();
 

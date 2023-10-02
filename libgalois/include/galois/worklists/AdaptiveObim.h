@@ -402,7 +402,7 @@ private:
         double diff = ((p.maxPrio >> delta) - (p.minPrio >> delta)) >= 1
                           ? ((p.maxPrio >> delta) - (p.minPrio >> delta))
                           : 1;
-        double xx = 16 / diff;
+        double xx   = 16 / diff;
         if (delta > (unsigned int)(std::floor(std::log2(xx))))
           delta -= (unsigned int)(std::floor(std::log2(xx)));
         else

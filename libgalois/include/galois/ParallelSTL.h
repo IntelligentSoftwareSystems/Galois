@@ -119,7 +119,7 @@ struct sort_helper {
       RandomAccessIterator pivot = choose_rand(bounds.first, bounds.second);
       VT pv                      = *pivot;
       pivot                      = std::partition(bounds.first, bounds.second,
-                             std::bind(comp, std::placeholders::_1, pv));
+                                                  std::bind(comp, std::placeholders::_1, pv));
       // push the lower bit
       if (bounds.first != pivot)
         ctx.push(std::make_pair(bounds.first, pivot));
@@ -209,7 +209,7 @@ struct partition_helper {
     RP high, low;
     do {
       RP parts  = dual_partition(low.first, low.second, high.first, high.second,
-                                state->pred);
+                                 state->pred);
       low.first = parts.first;
       high.second = parts.second;
       if (low.first == low.second)

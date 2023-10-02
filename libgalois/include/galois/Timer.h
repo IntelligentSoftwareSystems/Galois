@@ -72,10 +72,10 @@ public:
 
   StatTimer() : StatTimer(nullptr, nullptr) {}
 
-  StatTimer(const StatTimer&) = delete;
-  StatTimer(StatTimer&&)      = delete;
+  StatTimer(const StatTimer&)            = delete;
+  StatTimer(StatTimer&&)                 = delete;
   StatTimer& operator=(const StatTimer&) = delete;
-  StatTimer& operator=(StatTimer&&) = delete;
+  StatTimer& operator=(StatTimer&&)      = delete;
 
   ~StatTimer();
 

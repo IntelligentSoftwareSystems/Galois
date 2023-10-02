@@ -172,7 +172,7 @@ public:
     return *this;
   }
 
-  LargeArray(const LargeArray&) = delete;
+  LargeArray(const LargeArray&)            = delete;
   LargeArray& operator=(const LargeArray&) = delete;
 
   ~LargeArray() {
@@ -305,8 +305,8 @@ private:
 
 public:
   LargeArray(void*, size_t) {}
-  LargeArray()                  = default;
-  LargeArray(const LargeArray&) = delete;
+  LargeArray()                             = default;
+  LargeArray(const LargeArray&)            = delete;
   LargeArray& operator=(const LargeArray&) = delete;
 
   friend void swap(LargeArray&, LargeArray&) {}

@@ -178,7 +178,7 @@ float_t dot(size_t n, const float_t* x, const float_t* y) {
 // concatenation of two vectors into one
 void concat(size_t n, const float_t* x, const float_t* y, float_t* z) {
   copy_cpu(n, x, z);
-  copy_cpu(n, y, z+n);
+  copy_cpu(n, y, z + n);
 }
 
 void clear_cpu(size_t n, float_t* in) {
@@ -244,11 +244,11 @@ void d_relu_cpu(size_t n, const float_t* in, const float_t* data,
       galois::chunk_size<64>(), galois::loopname("d_relu"));
 }
 
-void leaky_relu(float_t epsilon, float_t in, float_t &out) {
+void leaky_relu(float_t epsilon, float_t in, float_t& out) {
   out = in > 0.0 ? in : epsilon * in;
 }
 
-void d_leaky_relu(float_t epsilon, float_t in, float_t data, float_t &out) {
+void d_leaky_relu(float_t epsilon, float_t in, float_t data, float_t& out) {
   out = in * (data > 0.0 ? 1.0 : epsilon);
 }
 

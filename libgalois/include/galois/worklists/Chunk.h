@@ -145,8 +145,8 @@ private:
 public:
   typedef T value_type;
 
-  ChunkMaster()                   = default;
-  ChunkMaster(const ChunkMaster&) = delete;
+  ChunkMaster()                              = default;
+  ChunkMaster(const ChunkMaster&)            = delete;
   ChunkMaster& operator=(const ChunkMaster&) = delete;
 
   void flush() {

@@ -1,5 +1,5 @@
 #include "galois/GNNTypes.h"
-//#include "galois/Logging.h"
+// #include "galois/Logging.h"
 
 namespace galois {
 namespace graphs {

@@ -10,25 +10,25 @@
 
 namespace galois {
 
-//! ReLU layer: takes each row of the input matrix and sets 0 to elements < 0 in a row.
-//! Currently this only works with **single class* labels and is coded as such.
+//! ReLU layer: takes each row of the input matrix and sets 0 to elements < 0 in
+//! a row. Currently this only works with **single class* labels and is coded as
+//! such.
 template <typename VTy, typename ETy>
 class ReLULayer : public GNNLayer<VTy, ETy> {
 public:
-  ReLULayer(size_t layer_num,
-            const galois::graphs::GNNGraph<VTy, ETy>& graph,
+  ReLULayer(size_t layer_num, const galois::graphs::GNNGraph<VTy, ETy>& graph,
             PointerWithSize<GNNFloat>* backward_output_matrix,
             const GNNLayerDimensions& dimensions)
       : ReLULayer<VTy, ETy>(
             layer_num, graph, backward_output_matrix, dimensions,
-            GNNLayerConfig{.allocate_weights = false, .disable_output = true})
-      {}
+            GNNLayerConfig{.allocate_weights = false, .disable_output = true}) {
+  }
 
   ReLULayer(size_t layer_num, const galois::graphs::GNNGraph<VTy, ETy>& graph,
             PointerWithSize<GNNFloat>* backward_output_matrix,
-            const GNNLayerDimensions& dimensions,
-            const GNNLayerConfig& config) : GNNLayer<VTy, ETy>(layer_num, graph,
-            backward_output_matrix, dimensions, config) {
+            const GNNLayerDimensions& dimensions, const GNNLayerConfig& config)
+      : GNNLayer<VTy, ETy>(layer_num, graph, backward_output_matrix, dimensions,
+                           config) {
     this->layer_type_ = galois::GNNLayerType::kReLU;
     GALOIS_LOG_ASSERT(dimensions.input_columns == dimensions.output_columns);
     GALOIS_LOG_VERBOSE("ReLU initialized");
@@ -79,9 +79,9 @@ public:
     return this->forward_output_matrix_;
   }
 
-  PointerWithSize<galois::GNNFloat> BackwardPhaseCPU(
-      PointerWithSize<galois::GNNFloat> prev_layer_input,
-      PointerWithSize<galois::GNNFloat>* input_gradients) {
+  PointerWithSize<galois::GNNFloat>
+  BackwardPhaseCPU(PointerWithSize<galois::GNNFloat> prev_layer_input,
+                   PointerWithSize<galois::GNNFloat>* input_gradients) {
     galois::StatTimer Timer("ReLUBackward", "ReLULayer");
     this->TimerStart(&Timer);
 
@@ -102,8 +102,8 @@ public:
             for (size_t row_index = row_offset;
                  row_index < (row_offset + feature_length); row_index++) {
               this->p_backward_output_matrix_[row_index] =
-                (prev_layer_input[row_index] > 0? 1 : 0) *
-                (*input_gradients)[row_index];
+                  (prev_layer_input[row_index] > 0 ? 1 : 0) *
+                  (*input_gradients)[row_index];
             }
           }
         },
