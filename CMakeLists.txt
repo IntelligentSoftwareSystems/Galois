@@ -141,9 +141,7 @@ endif()
 # TODO (loc) prefix with GALOIS, move elsewhere more fitting in this file
 ################################################################################
 if(USE_MKL_BLAS)
-  SET(MKL_ROOT /home/hochan/intel/oneapi/mkl/2023.1.0)
-  find_package(MKL REQUIRED)
-  message(STATUS "MKL: ${MKL_INCLUDE_DIRS}")
+  find_package(MKL CONFIG REQUIRED PATH $ENV{MKL_ROOT})
   if (MKL_FOUND)
   else()
     message(WARNING "MKL not found")

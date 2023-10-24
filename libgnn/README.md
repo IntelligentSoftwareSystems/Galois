@@ -560,3 +560,21 @@ data depending on the size of the minibatch. The best way to avoid this
 in general, though, is to just allocate space for the test subgraph's
 k-hops since that is likely to be more expensive than whatever
 the minibatch size for the train nodes are (unless it's all nodes).
+
+Author: Hochan Lee, <hochan@utexas.edu>
+
+# Intel Open API MKL
+
+Galois-GNN requires Intel Math Kernel Library (MKL), and so, you are required to
+install Intel oneAPI. This toolkit contains all the necessary tools and libraries including
+the MKL library. We recommend to get Intel oneAPI >= 2023.1.0. from the Intel official website
+(https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html)
+as this is what we have used and tested.
+
+Once you followed their instruction and installed Intel oneAPI,
+you should export the MKL path in the installation path to your environment
+before you cmake and install Galois-GNN. CMakeLists.txt will look for the MKL root path.
+
+```Shell
+export MKL_ROOT=[THE PARENT PATH OF THE INSTALLATION PATH]/intel/openapi/mkl/2023.1.0
+```

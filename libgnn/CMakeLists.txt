@@ -6,34 +6,29 @@ set(sources
   src/graphs/GNNGraph.cpp
 )
 
-## TODO(hc): Note that these libraries should be hard-coded
-## based on your own system.
-## These should be automatic library linking.
-set(MKL_LIBRARIES ${MKL_ROOT}/lib/intel64)
-set(INTEL_COMPILER_LIBRARIES /home/hochan/intel/oneapi/compiler/2023.1.0/linux/compiler/lib/intel64_lin)
-set(INTEL_LIBS "-lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5")
-set(SINGLE_INTEL_LIBS "-lmkl_intel_lp64 -lmkl_sequential -lmkl_core")
-
 add_library(galois_gnn STATIC ${sources})
 
-target_link_directories(galois_gnn PUBLIC ${MKL_LIBRARIES})
-target_link_libraries(galois_gnn ${INTEL_LIBS})
-target_link_directories(galois_gnn PUBLIC ${INTEL_COMPILER_LIBRARIES})
-target_link_libraries(galois_gnn galois_shmem)
-target_link_libraries(galois_gnn galois_dist_async galois_cusp galois_gluon galois_support)
+target_compile_options(galois_gnn PUBLIC
+		$<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+target_include_directories(galois_gnn PUBLIC
+		$<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
+target_link_libraries(galois_gnn PUBLIC $<LINK_ONLY:MKL::MKL>)
+target_link_libraries(galois_gnn PUBLIC galois_shmem)
+target_link_libraries(galois_gnn PUBLIC galois_dist_async galois_cusp galois_gluon galois_support)
 target_include_directories(galois_gnn PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${MKL_INCLUDE_DIRS}
 )
 
 add_library(galois_gnn_single STATIC ${sources})
-target_link_directories(galois_gnn_single PUBLIC ${MKL_LIBRARIES})
-target_link_libraries(galois_gnn_single galois_shmem)
-target_link_libraries(galois_gnn_single ${SINGLE_INTEL_LIBS})
-target_link_libraries(galois_gnn_single galois_dist_async galois_cusp galois_gluon galois_support)
+target_compile_options(galois_gnn_single PUBLIC
+		$<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+target_include_directories(galois_gnn_single PUBLIC
+		$<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
+target_link_libraries(galois_gnn_single PUBLIC $<LINK_ONLY:MKL::MKL>)
+target_link_libraries(galois_gnn_single PUBLIC galois_shmem)
+target_link_libraries(galois_gnn_single PUBLIC galois_dist_async galois_cusp galois_gluon galois_support)
 target_include_directories(galois_gnn_single PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${MKL_INCLUDE_DIRS}
 )
 
 set_target_properties(galois_gnn PROPERTIES EXPORT_NAME galois_gnn)
