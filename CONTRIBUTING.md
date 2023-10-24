@@ -6,6 +6,12 @@ tools like `clang-format` manually.
 
 Code should be clear and documented where needed.
 
+## Setup
+
+Users can run `make docker-image` to setup all dependecies needed for
+`pando-galois`.  After creating the image it can be run via `make docker`.
+And for first time cmake users can run `make run-cmake`.
+
 ## Tools
 
 ### [asdf](https://asdf-vm.com)
