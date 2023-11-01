@@ -69,6 +69,7 @@ public:
           // do softmax
           GNNSoftmax(feature_length, &input_embeddings[feature_length * i],
                      &this->p_backward_output_matrix_[feature_length * i]);
+
           // create ground truth vector for this LID
           std::vector<GNNFloat>* ground_truth_vec =
               ground_truth_vectors_.getLocal();
@@ -97,7 +98,6 @@ public:
     galois::gPrint("Loss is ", reduced_loss / t, " ", reduced_loss, " ", t,
                    "\n");
 #endif
-
     this->TimerStop(&Timer);
     return this->p_backward_output_matrix_;
   }
@@ -127,7 +127,8 @@ public:
         galois::iterate(size_t{0}, this->layer_dimensions_.input_rows),
         [&](const unsigned node) {
           if (this->IsSampledLayer()) {
-            if (this->layer_phase_ == GNNPhase::kTrain &&
+            if ((this->layer_phase_ == GNNPhase::kTrain ||
+                 this->layer_phase_ == GNNPhase::kBatch) &&
                 !this->graph_.IsInSampledGraphSubgraph(node))
               return;
           }

@@ -500,8 +500,10 @@ public:
     galois::StatTimer epoch_timer("TrainingTime", kRegionName);
     galois::StatTimer validation_timer("ValidationTime", kRegionName);
     galois::StatTimer epoch_test_timer("TestTime", kRegionName);
-
+    float total_checked{0}, correct{0};
     for (size_t epoch = 0; epoch < num_epochs; epoch++) {
+      total_checked = 0;
+      correct       = 0;
       epoch_timer.start();
       // swap to train subgraph
       if (config_.use_train_subgraph_ && !config_.train_minibatch_size()) {
@@ -684,16 +686,30 @@ public:
           mb_timer.stop();
 
           const PointerWithSize<galois::GNNFloat> batch_pred = DoInference();
-          train_accuracy = GetGlobalAccuracy(batch_pred);
+
+          if (graph_->is_using_wmd()) {
+            std::pair<float, float> accuracy_results =
+                this->graph_->GetGlobalAccuracyCheckResult(
+                    batch_pred, phase_, config_.do_sampling());
+            train_accuracy = accuracy_results.first / accuracy_results.second;
+            correct += accuracy_results.first;
+            total_checked += accuracy_results.second;
+            galois::gPrint("Epoch ", epoch, " Batch ", batch_num - 1,
+                           ": The number of correct answers is ", correct, "/",
+                           total_checked, "\n");
+          } else {
+            train_accuracy = GetGlobalAccuracy(batch_pred);
+            galois::gPrint("Epoch ", epoch, " Batch ", batch_num - 1,
+                           ": Train accuracy/F1 micro is ", train_accuracy,
+                           " time ", batch_timer.get(), "\n");
+          }
+
           GradientPropagation();
 
           work_left_ += graph_->MoreTrainMinibatches();
           char global_work_left = work_left_.reduce();
           batch_timer.stop();
           epoch_timer.stop();
-          galois::gPrint("Epoch ", epoch, " Batch ", batch_num - 1,
-                         ": Train accuracy/F1 micro is ", train_accuracy,
-                         " time ", batch_timer.get(), "\n");
 
           bool test_eval =
               config_.minibatch_test_interval_
@@ -760,6 +776,9 @@ public:
       if (this_host == 0) {
         const std::string t_name_acc =
             "TrainEpoch" + std::to_string(epoch) + "Accuracy";
+        if (config_.train_minibatch_size() && this->graph_->is_using_wmd()) {
+          train_accuracy = correct / total_checked;
+        }
         galois::gPrint("Epoch ", epoch, ": Train accuracy/F1 micro is ",
                        train_accuracy, "\n");
         galois::runtime::reportStat_Single(kRegionName, t_name_acc,

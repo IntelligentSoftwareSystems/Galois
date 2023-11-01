@@ -53,15 +53,15 @@ public:
   //  galois::LargeArray<std::vector<bool>>>;
 
   GNNGraph(const std::string& dataset_name, GNNPartitionScheme partition_scheme,
-           bool has_single_class_label, bool useWMD = false)
+           bool has_single_class_label, bool use_wmd = false)
       : GNNGraph(galois::default_gnn_dataset_path, dataset_name,
-                 partition_scheme, has_single_class_label, useWMD) {}
+                 partition_scheme, has_single_class_label, use_wmd) {}
 
   //! Loads a graph and all relevant metadata (labels, features, masks, etc.)
   GNNGraph(const std::string& input_directory, const std::string& dataset_name,
            GNNPartitionScheme partition_scheme, bool has_single_class_label,
-           bool useWMD = false)
-      : input_directory_(input_directory) {
+           bool use_wmd = false)
+      : input_directory_(input_directory), use_wmd_(use_wmd) {
     GALOIS_LOG_VERBOSE("[{}] Constructing partitioning for {}", host_id_,
                        dataset_name);
     // save host id
@@ -72,7 +72,7 @@ public:
         std::string("] ");
     // load partition
     partitioned_graph_ =
-        LoadPartition(input_directory_, dataset_name, partition_scheme, useWMD);
+        LoadPartition(input_directory_, dataset_name, partition_scheme);
     galois::gInfo(host_prefix_, "Loading partition is completed");
     // reverse edges
     partitioned_graph_->ConstructIncomingEdges();
@@ -93,7 +93,7 @@ public:
     bitset_graph_aggregate.resize(partitioned_graph_->size());
 
     // Construct/read additional graph data
-    if (useWMD) {
+    if (use_wmd) {
       galois::gInfo("Feature is constructed by aggregating 2-hop features, "
                     "instead from feature files");
       this->ConstructFeatureBy2HopAggregation();
@@ -939,7 +939,7 @@ public:
     this->Construct1HopFeatureCPU();
     // this->PrintFeatures("1hop");
     this->Construct2HopFeatureCPU();
-    this->PrintFeatures("2hop");
+    //this->PrintFeatures("2hop");
   }
 
   void PrintFeatures(std::string postfix) {
@@ -1176,6 +1176,16 @@ public:
                           bool sampling) {
     // No GPU version yet, but this is where it would be
     return GetGlobalAccuracyCPU(predictions, phase, sampling);
+  }
+
+  /**
+   * @brief Compare predictions from a model and ground truths, and return the
+   * results.
+   */
+  std::pair<float, float>
+  GetGlobalAccuracyCheckResult(PointerWithSize<GNNFloat> predictions,
+                               GNNPhase phase, bool sampling) {
+    return GetGlobalAccuracyCPUSingle(predictions, phase, sampling);
   }
 
   std::pair<uint32_t, uint32_t>
@@ -1622,6 +1632,9 @@ public:
     return definitely_sampled_nodes_;
   }
 
+  /* @brief Return true if this is constructed from a WMD graph otherwise false. */
+  bool is_using_wmd() { return this->use_wmd_; }
+
 private:
 // included like this to avoid cyclic dependency issues + not used anywhere but
 // in this class anyways
@@ -1632,12 +1645,13 @@ private:
   //////////////////////////////////////////////////////////////////////////////
 
   //! Partitions a particular dataset given some partitioning scheme
-  std::unique_ptr<GNNDistGraph> LoadPartition(
-      const std::string& input_directory, const std::string& dataset_name,
-      galois::graphs::GNNPartitionScheme partition_scheme, bool useWMD) {
+  std::unique_ptr<GNNDistGraph>
+  LoadPartition(const std::string& input_directory,
+                const std::string& dataset_name,
+                galois::graphs::GNNPartitionScheme partition_scheme) {
     // XXX input path
     std::string input_file = input_directory + dataset_name + ".csgr";
-    if (useWMD) {
+    if (this->use_wmd_) {
       input_file = dataset_name;
     }
     GALOIS_LOG_VERBOSE("Partition loading: File to read is {}", input_file);
@@ -1646,16 +1660,16 @@ private:
     switch (partition_scheme) {
     case galois::graphs::GNNPartitionScheme::kOEC:
       return galois::cuspPartitionGraph<GnnOEC, VTy, ETy>(
-          input_file, galois::CUSP_CSR, galois::CUSP_CSR, useWMD, true, "", "",
-          false, 1);
+          input_file, galois::CUSP_CSR, galois::CUSP_CSR, this->use_wmd_, true,
+          "", "", false, 1);
     case galois::graphs::GNNPartitionScheme::kCVC:
       return galois::cuspPartitionGraph<GnnCVC, VTy, ETy>(
-          input_file, galois::CUSP_CSR, galois::CUSP_CSR, useWMD, true, "", "",
-          false, 1);
+          input_file, galois::CUSP_CSR, galois::CUSP_CSR, this->use_wmd_, true,
+          "", "", false, 1);
     case galois::graphs::GNNPartitionScheme::kOCVC:
       return galois::cuspPartitionGraph<GenericCVC, VTy, ETy>(
-          input_file, galois::CUSP_CSR, galois::CUSP_CSR, useWMD, true, "", "",
-          false, 1);
+          input_file, galois::CUSP_CSR, galois::CUSP_CSR, this->use_wmd_, true,
+          "", "", false, 1);
     default:
       GALOIS_LOG_FATAL("Error: partition scheme specified is invalid");
       return nullptr;
@@ -1680,6 +1694,7 @@ private:
     // is better
     std::mutex label_class_set_mtx;
     std::unordered_set<int> label_class_set;
+    num_label_classes_ = 0;
     galois::do_all(galois::iterate(size_t{0}, graph.size()), [&](size_t lid) {
       local_ground_truth_labels_[lid] = graph.getData(lid).type;
       label_class_set_mtx.lock();
@@ -2362,7 +2377,9 @@ private:
     float accuracy{0};
     if (is_single_class_label()) {
       global_accuracy_for_singleclass_timer.start();
-      accuracy = GetGlobalAccuracyCPUSingle(predictions, phase, sampling);
+      auto accuracy_result =
+          GetGlobalAccuracyCPUSingle(predictions, phase, sampling);
+      accuracy = accuracy_result.first / accuracy_result.second;
       global_accuracy_for_singleclass_timer.stop();
     } else {
       global_accuracy_for_multiclass_timer.start();
@@ -2373,12 +2390,30 @@ private:
     return accuracy;
   }
 
-  float GetGlobalAccuracyCPUSingle(PointerWithSize<GNNFloat> predictions,
-                                   GNNPhase phase, bool) {
+  std::pair<float, float>
+  GetGlobalAccuracyCPUSingle(PointerWithSize<GNNFloat> predictions,
+                             GNNPhase phase, bool) {
     // check owned nodes' accuracy
     num_correct_.reset();
     total_checked_.reset();
 
+#if 0
+    std::cout << "single accuracy print:\n";
+    for (int i = *begin_owned(); i < *end_owned(); ++i) {
+      if (!IsValidForPhase(i, GNNPhase::kBatch)) {
+        continue; 
+      }
+      //std::cout << subgraph_->SIDToLID(i) << ", " << galois::MaxIndex(num_label_classes_, &predictions[i * num_label_classes_]) <<
+      std::cout << "accuracy:" << subgraph_->SIDToLID(i) << ", " << 
+      predictions[i * num_label_classes_] << ", " <<
+      predictions[i * num_label_classes_ + 1] << ", " <<
+      predictions[i * num_label_classes_ + 2] << ", " <<
+      predictions[i * num_label_classes_ + 3] << ", " <<
+      predictions[i * num_label_classes_ + 4] << "-> " <<
+      galois::MaxIndex(num_label_classes_, &predictions[i * num_label_classes_]) <<
+      " vs " << GetSingleClassLabel(i) << "\n";
+    }
+#endif
     galois::do_all(
         // will only loop over sampled nodes if sampling is on
         galois::iterate(begin_owned(), end_owned()),
@@ -2408,9 +2443,8 @@ private:
 
     GALOIS_LOG_DEBUG("Sub: {}, Accuracy: {} / {}", use_subgraph_,
                      global_correct, global_checked);
-
-    return static_cast<float>(global_correct) /
-           static_cast<float>(global_checked);
+    return std::make_pair(static_cast<float>(global_correct),
+                          static_cast<float>(global_checked));
   }
 
   float GetGlobalAccuracyCPUMulti(PointerWithSize<GNNFloat> predictions,
@@ -2645,6 +2679,9 @@ private:
   std::unique_ptr<MinibatchGenerator> test_batcher_;
 
   std::vector<uint32_t> node_remapping_;
+
+  // True if a WMD graph is being used otherwise false
+  bool use_wmd_{false};
 
   //////////////////////////////////////////////////////////////////////////////
   // GPU things

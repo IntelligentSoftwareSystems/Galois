@@ -139,7 +139,8 @@ public:
     GNNFloat* agg_data;
     // first, dropout
     if (!this->config_.disable_dropout &&
-        (this->layer_phase_ == GNNPhase::kTrain)) {
+        (this->layer_phase_ == GNNPhase::kTrain ||
+         this->layer_phase_ == GNNPhase::kBatch)) {
       this->DoDropout(input_embeddings, &p_in_temp_1_);
       input_data = p_in_temp_1_.data();
       agg_data   = p_in_temp_2_.data();
@@ -187,7 +188,8 @@ public:
                                                  kRegionName);
     timer.start();
 
-    assert(this->layer_phase_ == GNNPhase::kTrain);
+    assert(this->layer_phase_ == GNNPhase::kTrain ||
+           this->layer_phase_ == GNNPhase::kBatch);
 
     // derivative of activation
     if (!this->config_.disable_activation) {
@@ -285,12 +287,11 @@ public:
                    input_gradient->data(), p_out_temp_.data(),
                    &output_column_intermediates_, true);
 
-      // done after above because input_data = p_backward_output_matrix in some
-      // cases; use first before overwriting here if layer # doesn't = 0, it
-      // means I can mess with the input data itself instad of masking the
-      // gradients I can mask the input
       if (this->layer_number_ != 0) {
         if (this->graph_.IsSubgraphOn()) {
+          // Gradients for mirror nodes should be updated by their owner
+          // hosts. In case of graph sampling, we should let this know whether
+          // a node is a sampled master or not.
           this->MaskInputNonMasters(&input_data,
                                     this->layer_dimensions_.input_rows,
                                     this->graph_.GetNonLayerZeroMasters());
@@ -299,6 +300,8 @@ public:
                                     this->layer_dimensions_.input_rows);
         }
       } else {
+        // The first layer can zerofy non-master nodes' gradients since
+        // it is the last gradient aggregation.
         // if 0 then no input to mask: mask the gradient
         // this is fine because gradient won't be used to get feature gradients
         if (this->graph_.IsSubgraphOn()) {
@@ -320,6 +323,12 @@ public:
       } else {
 #endif
         weight_gradient_timer.start();
+        // p_out_temp aggregated gradients from the next layer.
+        // The weight gradients for this layer is calculated by
+        // (The current vertex embedding x p_out_temp).
+        // Vertex embedding dimension is (input row x input column),
+        // p_out_temp dimension is (input row x output column),
+        // and weight is (input column x output column).
         galois::CBlasSGEMM(
             CblasTrans, CblasNoTrans, this->layer_dimensions_.input_columns,
             this->layer_dimensions_.input_rows,
@@ -382,13 +391,18 @@ private:
                   galois::substrate::PerThreadStorage<std::vector<GNNFloat>>*,
                   bool is_backward) {
     galois::StatTimer aggregate_all_sync_timer("AggregateSync", kRegionName);
-    size_t num_nodes   = (is_backward) ? this->layer_dimensions_.input_rows
-                                       : this->layer_dimensions_.output_rows;
+    size_t num_nodes   = (is_backward)
+                             ? this->layer_dimensions_.input_rows
+                           // In case of minibatching or graph sampling,
+                           // the outut row must be the samped graph's number of
+                           // nodes of that layer.
+                             : this->layer_dimensions_.output_rows;
     size_t last_master = *(this->graph_.end_owned());
 
     assert(0 == *(this->graph_.begin_owned()));
 
     galois::do_all(
+        /* Either an original or a sampled graph iterator is used */
         galois::iterate(*(this->graph_.begin()), num_nodes),
         [&](size_t src) {
           size_t index_to_src_feature = src * column_length;
@@ -397,12 +411,13 @@ private:
             aggregate_output[index_to_src_feature + i] = 0;
           }
 
-          if (this->layer_phase_ == GNNPhase::kTrain) {
+          if (this->layer_phase_ == GNNPhase::kTrain ||
+              this->layer_phase_ == GNNPhase::kBatch) {
             if (this->IsSampledLayer()) {
               // Check if node is part of sampled graph; ignore after
               // 0'ing if it is not sampled.
               // TODO(hc): check if SAGE also checks this
-              if (!this->graph_.IsInSampledGraph(src)) {
+              if (!this->graph_.IsInSampledGraphSubgraph(src)) {
                 return;
               }
             }
@@ -550,11 +565,14 @@ private:
     } else {
 #endif
       // CPU version is just a call into CBlas
-      galois::CBlasSGEMM(CblasNoTrans, CblasNoTrans,
-                         this->layer_dimensions_.input_rows,
-                         this->layer_dimensions_.input_columns,
-                         this->layer_dimensions_.output_columns,
-                         node_embeddings, this->layer_weights_.data(), output);
+      galois::CBlasSGEMM(
+          CblasNoTrans, CblasNoTrans,
+          this->layer_dimensions_.input_rows /* Graph or sampled graph nodes */,
+          this->layer_dimensions_.input_columns,
+          this->layer_dimensions_.output_columns,
+          node_embeddings /* input row x input columns */,
+          this->layer_weights_.data() /* input column x output column */,
+          output);
 #ifdef GALOIS_ENABLE_GPU
     }
 #endif
