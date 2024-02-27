@@ -702,7 +702,7 @@ private: ///////////////////////////////////////////////////////////////////////
   EdgeTy*
   constructOutEdgeValue(FileGraph&, typename FileGraph::edge_iterator,
                         GraphNode src, GraphNode dst,
-                        typename std::enable_if<_A1&& !_A2>::type* = 0) {
+                        typename std::enable_if<_A1 && !_A2>::type* = 0) {
     return createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
 

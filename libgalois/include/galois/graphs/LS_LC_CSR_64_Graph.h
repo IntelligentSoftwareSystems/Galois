@@ -293,13 +293,13 @@ protected:
 
   template <bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag,
-                   typename std::enable_if<!_A1&& !_A2>::type* = 0) {
+                   typename std::enable_if<!_A1 && !_A2>::type* = 0) {
     galois::runtime::acquire(&nodeData[N], mflag);
   }
 
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
   void acquireNode(GraphNode N, MethodFlag mflag,
-                   typename std::enable_if<_A1&& !_A2>::type* = 0) {
+                   typename std::enable_if<_A1 && !_A2>::type* = 0) {
     this->outOfLineAcquire(getId(N), mflag);
   }
 
@@ -338,7 +338,7 @@ protected:
   template <bool _A1 = EdgeData::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph&, typename FileGraph::edge_iterator nn,
-                          typename std::enable_if<_A1&& !_A2>::type* = 0) {
+                          typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edgeData.set(*nn, {});
   }
 
@@ -556,6 +556,7 @@ public:
         galois::steal());
   }
 
+<<<<<<< HEAD
   /**
    * Add edges into the graph
    *
@@ -576,6 +577,18 @@ public:
 
     auto edgeStart = ee;
     auto orig_itr  = edge_begin(src);
+=======
+  template <typename T>
+  void addEdgesUnSort(bool setEdgeVals, GraphNode src, EdgeDst::value_type* dst,
+                      T* dst_data, uint64_t num_dst) {
+    acquireNode(src, galois::MethodFlag::WRITE);
+    auto orig_deg = getDegree(src);
+    auto ee = edgeEnd.fetch_add(num_dst + orig_deg, std::memory_order_relaxed);
+    auto edgeStart = ee;
+    auto orig_itr  = edge_begin(src);
+    auto orig_end  = edge_end(src);
+    auto dst_end   = dst + num_dst;
+>>>>>>> ccbe0f155 (add new LS_CSR and LargeVector implementations (#1))
 
     std::memcpy(&edgeDst[edgeStart], &edgeDst[*orig_itr],
                 sizeof(EdgeDst::value_type) * orig_deg);
@@ -593,11 +606,15 @@ public:
 
     edgeIndData[src].first  = edgeStart;
     edgeIndData[src].second = edgeStart + num_dst + orig_deg;
+<<<<<<< HEAD
 
     if (!keep_size) {
       numEdges.fetch_add(num_dst, std::memory_order_relaxed);
     }
     prefixValid = false;
+=======
+    numEdges.fetch_add(num_dst, std::memory_order_relaxed);
+>>>>>>> ccbe0f155 (add new LS_CSR and LargeVector implementations (#1))
   }
 
   void addEdgeSort(const uint64_t src, const uint64_t dst) {
@@ -687,6 +704,7 @@ public:
     numEdges.fetch_add(edgePlace - edgeStart - orig_deg,
                        std::memory_order_relaxed);
     prefixValid = false;
+    // releaseNode(src);
   }
 
   template <typename PTM>
