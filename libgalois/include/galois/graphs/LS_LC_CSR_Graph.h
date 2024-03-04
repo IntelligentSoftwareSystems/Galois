@@ -120,15 +120,15 @@ public:
 
     vertex_meta.lock();
     {
-      uint64_t new_begin, new_end, new_degree;
+      uint64_t const new_degree = vertex_meta.degree + dsts.size();
+      uint64_t new_begin;
       m_edges_lock.lock();
       {
-        new_begin  = m_edges[1].size();
-        new_degree = vertex_meta.degree + dsts.size();
+        new_begin = m_edges[1].size();
         m_edges[1].resize(new_begin + new_degree);
-        new_end = m_edges[1].size();
       }
       m_edges_lock.unlock();
+      uint64_t const new_end = new_begin + new_degree;
 
       // insert new edges
       std::transform(dsts.begin(), dsts.end(), &getEdgeMetadata(1, new_begin),

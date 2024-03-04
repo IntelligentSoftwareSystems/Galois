@@ -13,6 +13,7 @@
 #include <list>
 #include <string.h>
 #include <utility>
+
 namespace galois {
 /*
  * A vector backed by huge pages. Guarantees addresss stability, so values do
@@ -32,12 +33,12 @@ private:
   T* m_data;
 
   int m_fd;
-  std::list<std::pair<void*, size_t>> m_mappings;
+  std::list<std::pair<void*, size_t>> m_mappings; // sorted by size decreasing
 
   void ensure_capacity(size_t new_cap) {
-    using std::string;
-
-    if (m_capacity == new_cap)
+    if (new_cap > m_capacity)
+      new_cap = std::max(new_cap, m_capacity * 2);
+    else if (new_cap > 0)
       return;
 
     // Round up to the nearest huge page size.
@@ -46,44 +47,45 @@ private:
         (new_cap * sizeof(T) + (page_size - 1)) & (~(page_size - 1));
 
     if (ftruncate(m_fd, file_size) == -1)
-      throw std::runtime_error(string("ftruncate: ") + strerror(errno));
+      throw std::runtime_error(std::string("ftruncate: ") +
+                               std::strerror(errno));
 
     // Floor divide to find the real capacity.
-    new_cap = file_size / sizeof(T);
+    m_capacity = file_size / sizeof(T);
 
-    // We only need to remap if the new capacity is larger. Otherwise,
-    // we'll just truncate the file to release any used physical pages
-    // and keep the existing mapping.
-    const bool remap = new_cap > m_capacity;
-
-    m_capacity = new_cap;
-
-    if (!remap)
+    // Check whether the existing mapping covers the new capacity.
+    if (m_mappings.front().second >= m_capacity * sizeof(T))
       return;
 
-    const size_t mmap_size = m_capacity * sizeof(T);
-    if (!mmap_size) {
-      m_data = nullptr;
-      return;
-    }
+    // Create a new virtual address mapping if a previous mapping is not large
+    // enough to access the new capacity.
+    //
+    // To avoid exhausting the virtual address space with lots of
+    // similarly-sized allocations, we always at least double the size.
+    size_t const mmap_size =
+        std::max(m_mappings.front().second * 2, m_capacity * sizeof(T));
+
+    std::cout << "new_cap = " << new_cap << "\tmmap_size = " << mmap_size
+              << std::endl;
 
     m_data =
         static_cast<T*>(mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE,
                              MAP_SHARED | MAP_HUGETLB | MAP_HUGE_2MB, m_fd, 0));
     if (m_data == MAP_FAILED)
-      throw std::runtime_error(string("mmap failed: ") + strerror(errno));
+      throw std::runtime_error(std::string("mmap failed: ") +
+                               std::strerror(errno));
 
-    m_mappings.push_back(std::make_pair(m_data, mmap_size));
+    m_mappings.push_front(std::make_pair(m_data, mmap_size));
   }
 
 public:
   LargeVector(size_t initial_capacity)
       : m_capacity(0), m_size(0), m_data(nullptr),
-        m_fd(memfd_create("LargeVector", MFD_HUGETLB | MFD_HUGE_2MB)) {
-    if (m_fd == -1) {
+        m_fd(memfd_create("LargeVector", MFD_HUGETLB | MFD_HUGE_2MB)),
+        m_mappings({std::make_pair(nullptr, 0)}) {
+    if (m_fd == -1)
       throw std::runtime_error(std::string("creating memfd: ") +
-                               strerror(errno));
-    }
+                               std::strerror(errno));
     ensure_capacity(initial_capacity);
   }
 
@@ -118,7 +120,8 @@ public:
 
   ~LargeVector() {
     for (; !m_mappings.empty(); m_mappings.pop_front())
-      munmap(m_mappings.front().first, m_mappings.front().second);
+      if (m_mappings.front().first != nullptr)
+        munmap(m_mappings.front().first, m_mappings.front().second);
 
     if (m_fd != -1)
       close(m_fd);
