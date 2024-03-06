@@ -35,13 +35,7 @@
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/GraphHelpers.h"
 #include "galois/PODResizeableArray.h"
-<<<<<<< HEAD
-#include "galois/Reduction.h"
-
-
-=======
 #include "galois/PrefixSum.h"
->>>>>>> 1729f3c40 (Prefix sums for thread ranges)
 
 namespace galois::graphs {
 /**
@@ -600,51 +594,16 @@ public:
     edgeIndData[src].first  = edgeStart;
     edgeIndData[src].second = edgeStart + num_dst + orig_deg;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     if (!keep_size)
       numEdges.fetch_add(num_dst, std::memory_order_relaxed);
-=======
-#if GRAPH_PROFILE
-=======
 #ifdef GRAPH_PROFILE
-<<<<<<< HEAD
->>>>>>> b09e68c3c (fix: typo)
     this->local_rnd_write_counts  += 1;
     this->local_rnd_write_bytes   += 8;
-=======
-    this->local_rand_write_count  += 1;
-    this->local_rand_write_size   += 8;
->>>>>>> 709cc4565 (feat: profile each host seperatly)
 #endif
 
-<<<<<<< HEAD
     numEdges.fetch_add(num_dst, std::memory_order_relaxed);
-<<<<<<< HEAD
-#if GRAPH_PROFILE
-    this->local_rnd_rmw_counts += 1;
-    this->local_rnd_rmw_bytes += 8;
-#endif
 
->>>>>>> 76d458d30 (Initial commit of instrumentation for Yineng)
-=======
-=======
->>>>>>> f4d386172 (style: address some style issues and add comments)
-=======
->>>>>>> 5901b24b6 (chore: Run clang-format on the repo and add git hooks from gnn branch)
-    if (!keep_size) {
-      numEdges.fetch_add(num_dst, std::memory_order_relaxed);
-    }
-<<<<<<< HEAD
->>>>>>> b09e68c3c (fix: typo)
-=======
     prefixValid = false;
->>>>>>> dd7b8210a (Another small compilation bug, needed to return the right object)
-=======
-    prefixValid = false;
->>>>>>> a599b7169 (Small fixes for compilation issues)
   }
 
   void addEdgeSort(const uint64_t src, const uint64_t dst) {
@@ -987,19 +946,6 @@ public:
     maxNodes = numNodes;
 
     if (UseNumaAlloc) {
-<<<<<<< HEAD
-      nodeData.allocateBlocked(maxNodes);
-      edgeIndData.allocateBlocked(maxNodes);
-      edgeDst.allocateBlocked(maxEdges);
-      edgeData.allocateBlocked(maxEdges);
-      this->outOfLineAllocateBlocked(maxNodes);
-    } else {
-      nodeData.allocateInterleaved(maxNodes);
-      edgeIndData.allocateInterleaved(maxNodes);
-      edgeDst.allocateInterleaved(maxEdges);
-      edgeData.allocateInterleaved(maxEdges);
-      this->outOfLineAllocateInterleaved(maxNodes);
-=======
       nodeData.allocateBlocked(numNodes);
       edgeIndData.allocateBlocked(numNodes);
       edgeDst.allocateBlocked(numEdges);
@@ -1013,7 +959,6 @@ public:
       edgeData.allocateInterleaved(numEdges);
       pfxsum.allocateInterleaved(numNodes);
       this->outOfLineAllocateInterleaved(numNodes);
->>>>>>> 1729f3c40 (Prefix sums for thread ranges)
     }
     resetPrefixSum();
   }
@@ -1021,42 +966,24 @@ public:
   void allocateFrom(uint64_t nNodes, uint64_t nEdges) {
     numNodes = nNodes;
     numEdges = 0;
-<<<<<<< HEAD
-<<<<<<< HEAD
-    edgeEnd = 0;
-=======
     edgeEnd  = 0;
->>>>>>> 2fff1eb52 (Old fix that got borked somehow)
-=======
-    edgeEnd  = 0;
->>>>>>> 5901b24b6 (chore: Run clang-format on the repo and add git hooks from gnn branch)
     maxEdges = nEdges;
     maxNodes = nNodes;
 
     if (UseNumaAlloc) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 07ed363c0 (Old bugfix got borked)
-=======
->>>>>>> 2fff1eb52 (Old fix that got borked somehow)
       nodeData.allocateBlocked(maxNodes);
       edgeIndData.allocateBlocked(maxNodes);
       edgeDst.allocateBlocked(maxEdges);
       edgeData.allocateBlocked(maxEdges);
-<<<<<<< HEAD
-<<<<<<< HEAD
+      pfxsum.allocateInterleaved(maxNodes);
       this->outOfLineAllocateBlocked(maxNodes);
     } else {
       nodeData.allocateInterleaved(maxNodes);
       edgeIndData.allocateInterleaved(maxNodes);
       edgeDst.allocateInterleaved(maxEdges);
       edgeData.allocateInterleaved(maxEdges);
+      pfxsum.allocateInterleaved(maxNodes);
       this->outOfLineAllocateInterleaved(maxNodes);
-<<<<<<< HEAD
-=======
-=======
     }
     resetPrefixSum();
   }
@@ -1070,7 +997,6 @@ public:
 
     deallocate();
     if (UseNumaAlloc) {
->>>>>>> 5901b24b6 (chore: Run clang-format on the repo and add git hooks from gnn branch)
       nodeData.allocateBlocked(numNodes);
       edgeIndData.allocateBlocked(numNodes);
       edgeDst.allocateBlocked(numEdges);
@@ -1078,32 +1004,12 @@ public:
       prefixSumCache.allocateBlocked(numNodes);
       this->outOfLineAllocateBlocked(numNodes);
     } else {
-      nodeData.allocateInterleaved(numNodes);
-      edgeIndData.allocateInterleaved(numNodes);
-      edgeDst.allocateInterleaved(numEdges);
-      edgeData.allocateInterleaved(numEdges);
-      prefixSumCache.allocateInterleaved(numNodes);
-      this->outOfLineAllocateInterleaved(numNodes);
->>>>>>> 1729f3c40 (Prefix sums for thread ranges)
-=======
-      prefixSumCache.allocateBlocked(maxNodes);
-      this->outOfLineAllocateBlocked(maxNodes);
-    } else {
-=======
-      prefixSumCache.allocateBlocked(maxNodes);
-      this->outOfLineAllocateBlocked(maxNodes);
-    } else {
->>>>>>> 2fff1eb52 (Old fix that got borked somehow)
       nodeData.allocateInterleaved(maxNodes);
       edgeIndData.allocateInterleaved(maxNodes);
       edgeDst.allocateInterleaved(maxEdges);
       edgeData.allocateInterleaved(maxEdges);
       prefixSumCache.allocateInterleaved(maxNodes);
       this->outOfLineAllocateInterleaved(maxNodes);
-<<<<<<< HEAD
->>>>>>> 07ed363c0 (Old bugfix got borked)
-=======
->>>>>>> 2fff1eb52 (Old fix that got borked somehow)
     }
     resetPrefixSum();
   }
@@ -1117,19 +1023,6 @@ public:
 
     deallocate();
     if (UseNumaAlloc) {
-<<<<<<< HEAD
-      nodeData.allocateBlocked(maxNodes);
-      edgeIndData.allocateBlocked(maxNodes);
-      edgeDst.allocateBlocked(maxEdges);
-      edgeData.allocateBlocked(maxEdges);
-      this->outOfLineAllocateBlocked(maxNodes);
-    } else {
-      nodeData.allocateInterleaved(maxNodes);
-      edgeIndData.allocateInterleaved(maxNodes);
-      edgeDst.allocateInterleaved(maxEdges);
-      edgeData.allocateInterleaved(maxEdges);
-      this->outOfLineAllocateInterleaved(maxNodes);
-=======
       nodeData.allocateBlocked(numNodes);
       edgeIndData.allocateBlocked(numNodes);
       edgeDst.allocateBlocked(numEdges);
@@ -1143,7 +1036,6 @@ public:
       edgeData.allocateInterleaved(numEdges);
       prefixSumCache.allocateInterleaved(numNodes);
       this->outOfLineAllocateInterleaved(numNodes);
->>>>>>> 1729f3c40 (Prefix sums for thread ranges)
     }
     resetPrefixSum();
   }
