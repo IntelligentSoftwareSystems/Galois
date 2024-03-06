@@ -61,6 +61,6 @@ RUN echo "export SRC_DIR=${SRC_DIR}" >> /home/${UNAME}/.bashrc
 RUN echo "export BUILD_DIR=${BUILD_DIR}" >> /home/${UNAME}/.bashrc
 RUN echo "export OMPI_ALLOW_RUN_AS_ROOT=1" >> /home/${UNAME}/.bashrc
 RUN echo "export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1" >> /home/${UNAME}/.bashrc
-RUN echo "export MKL_ROOT=/opt/intel/oneapi/mkl/2023.2.0" >> /home/${UNAME}/.bashrc
+RUN echo "source /opt/intel/oneapi/setvars.sh > /dev/null" >> /home/${UNAME}/.bashrc
 
 WORKDIR ${SRC_DIR}
