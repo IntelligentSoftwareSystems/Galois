@@ -290,20 +290,6 @@ void determineUnitRangesLoopGraph(GraphTy& graph, uint32_t unitsToSplit,
       // unit assinged no nodes, copy last one
       returnRanges[i + 1] = returnRanges[i];
     }
-<<<<<<< HEAD
-=======
-
-    if (is_LS_LC_CSR) {
-      galois::gDebug("LoopGraph Unit ", i, " gets nodes ", returnRanges[i],
-                     " to ", returnRanges[i + 1], ", num edges is ",
-                     graph[returnRanges[i + 1] - 1] - graph[returnRanges[i]]);
-    } else {
-      galois::gDebug("LoopGraph Unit ", i, " gets nodes ", returnRanges[i],
-                     " to ", returnRanges[i + 1], ", num edges is ",
-                     graph.edge_end(returnRanges[i + 1] - 1) -
-                         graph.edge_begin(returnRanges[i]));
-    }
->>>>>>> 1d4ff12ff (feat: support loop ranges for LS_LC_CSR_64)
   }
 }
 

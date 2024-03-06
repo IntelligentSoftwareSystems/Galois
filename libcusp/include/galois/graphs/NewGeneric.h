@@ -1654,19 +1654,7 @@ private:
       waitTime.start();
       while (hostFinished.count() != base_DistGraph::numHosts ||
              loadsClear.count() != base_DistGraph::numHosts) {
-<<<<<<< HEAD
         // make sure all assignments are done and all loads are done
-=======
-        // #ifndef NDEBUG
-        //  galois::gDebug("[", base_DistGraph::id, "] waiting for all hosts to
-        //  finish, ",
-        //                hostFinished.count());
-        //  galois::gDebug("[", base_DistGraph::id, "] waiting for all hosts
-        //  loads "
-        //                "syncs to finish, ", loadsClear.count());
-        // #endif
-        //  make sure all assignments are done and all loads are done
->>>>>>> 5901b24b6 (chore: Run clang-format on the repo and add git hooks from gnn branch)
         syncAssignmentReceivesAsync(localNodeToMaster, gid2offsets,
                                     hostFinished);
         asyncRecvLoad(nodeLoads, edgeLoads, loadsClear);
