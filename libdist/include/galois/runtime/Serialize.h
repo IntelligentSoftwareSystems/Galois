@@ -278,14 +278,12 @@ gSizedObj(const T&,
   return sizeof(uintptr_t);
 }
 
-<<<<<<< HEAD
 //! Size of BufferWrapper is size + number of things in it
 template <typename T>
 inline size_t gSizedObj(const galois::BufferWrapper<T>& data) {
   return sizeof(size_t) + data.size() * sizeof(T);
 }
 
-=======
 template <typename T1, typename T2>
 inline size_t gSizedObj(const std::unordered_map<T1, T2>& data) {
   size_t sz = 0;
@@ -293,7 +291,6 @@ inline size_t gSizedObj(const std::unordered_map<T1, T2>& data) {
     sz += gSizedObj(i.first) + gSizedObj(i.second);
   return sz;
 }
->>>>>>> b1a39cdd7 (bug fix)
 /**
  * Returns the size necessary for storing 2 elements of a pair into a
  * serialize buffer.

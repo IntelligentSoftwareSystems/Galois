@@ -185,16 +185,6 @@ public:
 
     // initial pass; set up lid-gid mappings, determine which proxies exist on
     // this host
-<<<<<<< HEAD
-<<<<<<< HEAD
-    uint64_t nodeBegin = 0;
-    uint64_t nodeEnd = bufGraph.GIDtoLID.size();
-    base_DistGraph::numOwned = nodeEnd;
-
-    base_DistGraph::gid2host.resize(base_DistGraph::numHosts);
-=======
-=======
->>>>>>> d18e4e8d0 (fixed all bugs (hopefully))
     uint64_t nodeBegin = bufGraph.globalNodeOffset[base_DistGraph::id];
     uint64_t nodeEnd   = bufGraph.globalNodeOffset[base_DistGraph::id] +
                        bufGraph.localNodeSize[base_DistGraph::id];
@@ -215,15 +205,10 @@ public:
         std::pair<uint64_t, uint64_t>(
             bufGraph.globalNodeOffset[base_DistGraph::numHosts - 1],
             base_DistGraph::numGlobalNodes);
-<<<<<<< HEAD
-    graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
-=======
     graphPartitioner->saveGIDToHost(bufGraph.virtualToPhyMapping);
 
->>>>>>> d18e4e8d0 (fixed all bugs (hopefully))
-
-    std::vector<std::vector<uint64_t>> presentProxies = edgeInspectionRound1(bufGraph);
+    std::vector<std::vector<uint64_t>> presentProxies =
+        edgeInspectionRound1(bufGraph);
 
     // vector to store bitsets received from other hosts
     std::vector<std::vector<uint64_t>> proxiesOnOtherHosts;
@@ -256,13 +241,6 @@ public:
     // construct edges
     // not need to move edges from other host since all edges is already ready
     // when no edge mirror are used.
-<<<<<<< HEAD
-=======
-    for (uint64_t i = nodeBegin; i < nodeEnd; i++) {
-      auto edgeDst = bufGraph.edgeLocalDst(i);
-      I_RR();
-    }
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
     galois::gDebug("[", base_DistGraph::id, "] add edges into graph.");
     galois::do_all(
         galois::iterate(nodeBegin, nodeEnd),
@@ -279,8 +257,8 @@ public:
           I_RR();
           I_WM(bufGraph.edgeNum(globalID));
           base_DistGraph::graph.addEdgesUnSort(
-              true, (globalID - bufGraph.globalNodeOffset[base_DistGraph::id]), dstData.data(), edgeData,
-              bufGraph.edgeNum(globalID), false);
+              true, (globalID - bufGraph.globalNodeOffset[base_DistGraph::id]),
+              dstData.data(), edgeData, bufGraph.edgeNum(globalID), false);
         },
         galois::steal());
 
@@ -569,164 +547,83 @@ private:
 
   std::vector<std::vector<uint64_t>> edgeInspectionRound1(
       galois::graphs::WMDBufferedGraph<NodeTy, EdgeTy>& bufGraph) {
-<<<<<<< HEAD
-     std::vector<std::vector<uint64_t>> incomingMirrors(base_DistGraph::numHosts);
-    uint32_t myID         = base_DistGraph::id;
-=======
-    galois::DynamicBitSet incomingMirrors;
-    incomingMirrors.resize(base_DistGraph::numGlobalNodes);
-    incomingMirrors.reset();
-
-    uint64_t globalOffset;
-    globalOffset = bufGraph.globalNodeOffset[base_DistGraph::id];
-    I_RR();
-    // uint64_t globalOffset =
-    // base_DistGraph::gid2host[base_DistGraph::id].first;
-
-    // already set before this is called
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
+    std::vector<std::vector<uint64_t>> incomingMirrors(
+        base_DistGraph::numHosts);
+    uint32_t myID = base_DistGraph::id;
     base_DistGraph::localToGlobalVector.resize(base_DistGraph::numOwned);
     uint32_t activeThreads = galois::getActiveThreads();
-    std::vector<std::vector<std::set<uint64_t>>> incomingMirrorsPerThread(base_DistGraph::numHosts);
-    for(uint32_t h=0; h<base_DistGraph::numHosts; h++) {
-        incomingMirrorsPerThread[h].resize(activeThreads);
+    std::vector<std::vector<std::set<uint64_t>>> incomingMirrorsPerThread(
+        base_DistGraph::numHosts);
+    for (uint32_t h = 0; h < base_DistGraph::numHosts; h++) {
+      incomingMirrorsPerThread[h].resize(activeThreads);
     }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
     size_t start = bufGraph.globalNodeOffset[base_DistGraph::id];
     size_t end;
-    if(base_DistGraph::id != base_DistGraph::numHosts - 1)
-        end = bufGraph.globalNodeOffset[base_DistGraph::id + 1];
+    if (base_DistGraph::id != base_DistGraph::numHosts - 1)
+      end = bufGraph.globalNodeOffset[base_DistGraph::id + 1];
     else
-	end = bufGraph.localNodeSize[base_DistGraph::numHosts - 1] + bufGraph.globalNodeOffset[base_DistGraph::id];
+      end = bufGraph.localNodeSize[base_DistGraph::numHosts - 1] +
+            bufGraph.globalNodeOffset[base_DistGraph::id];
 
->>>>>>> d18e4e8d0 (fixed all bugs (hopefully))
     galois::on_each([&](unsigned tid, unsigned nthreads) {
       uint64_t beginNode;
       uint64_t endNode;
-      std::tie(beginNode, endNode) = galois::block_range(start, end, tid, nthreads);
+      std::tie(beginNode, endNode) =
+          galois::block_range(start, end, tid, nthreads);
 
-      for(uint64_t i = beginNode; i < endNode; ++i) {
-        auto ii            = bufGraph.edgeBegin(i);
-        auto ee            = bufGraph.edgeEnd(i);
+      for (uint64_t i = beginNode; i < endNode; ++i) {
+        auto ii = bufGraph.edgeBegin(i);
+        auto ee = bufGraph.edgeEnd(i);
         for (; ii < ee; ++ii) {
           uint64_t dst = bufGraph.edgeDestination(*ii);
-          uint64_t master_dst = bufGraph.virtualToPhyMapping[dst%(bufGraph.scaleFactor*base_DistGraph::numHosts)];
-            if (master_dst != myID) {
-                  assert(master_dst < base_DistGraph::numHosts);
-                  incomingMirrorsPerThread[master_dst][tid].insert(dst);
-            }
-        }
-        base_DistGraph::localToGlobalVector[i - bufGraph.globalNodeOffset[base_DistGraph::id]] = bufGraph.LIDtoGID[i - bufGraph.globalNodeOffset[base_DistGraph::id]];
-      }
-      });
-=======
-    auto& ltgv = base_DistGraph::localToGlobalVector;
-    galois::do_all(
-        galois::iterate(globalOffset,
-                        (bufGraph.globalNodeOffset[base_DistGraph::id] +
-                         bufGraph.localNodeSize[base_DistGraph::id])),
-        [&](size_t n) {
-          auto ii = bufGraph.edgeBegin(n);
-          auto ee = bufGraph.edgeEnd(n);
-          for (int k = 0; k < 2; k++)
-            I_RR();
-          for (; ii < ee; ++ii) {
-            uint32_t dst = bufGraph.edgeDestination(*ii);
-
-            // we keep all edges in OEC so no need to do the check
-            if ((dst < globalOffset) ||
-                (dst >= (bufGraph.globalNodeOffset[base_DistGraph::id] +
-                         bufGraph.localNodeSize[base_DistGraph::id]))) {
-              incomingMirrors.set(dst);
-              I_WR();
-            }
-            for (int k = 0; k < 3; k++)
-              I_RR();
+          uint64_t master_dst =
+              bufGraph.virtualToPhyMapping[dst % (bufGraph.scaleFactor *
+                                                  base_DistGraph::numHosts)];
+          if (master_dst != myID) {
+            assert(master_dst < base_DistGraph::numHosts);
+            incomingMirrorsPerThread[master_dst][tid].insert(dst);
           }
-          I_WR();
-          ltgv[n - globalOffset] = n;
-        },
-#if MORE_DIST_STATS
-        galois::loopname("EdgeInspectionLoop"),
-#endif
-        galois::steal(), galois::no_stats());
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
+        }
+        base_DistGraph::localToGlobalVector[i - bufGraph.globalNodeOffset
+                                                    [base_DistGraph::id]] =
+            bufGraph
+                .LIDtoGID[i - bufGraph.globalNodeOffset[base_DistGraph::id]];
+      }
+    });
 
     std::vector<std::set<uint64_t>> dest(base_DistGraph::numHosts);
-    for(uint32_t h=0; h<base_DistGraph::numHosts; h++) {
-      for(uint32_t t=0; t<activeThreads; t++) {
+    for (uint32_t h = 0; h < base_DistGraph::numHosts; h++) {
+      for (uint32_t t = 0; t < activeThreads; t++) {
         std::set<uint64_t> tempUnion;
         std::set_union(dest[h].begin(), dest[h].end(),
-                   incomingMirrorsPerThread[h][t].begin(), incomingMirrorsPerThread[h][t].end(),
-                   std::inserter(tempUnion, tempUnion.begin()));
+                       incomingMirrorsPerThread[h][t].begin(),
+                       incomingMirrorsPerThread[h][t].end(),
+                       std::inserter(tempUnion, tempUnion.begin()));
         dest[h] = tempUnion;
       }
-        std::copy(dest[h].begin(), dest[h].end(), std::back_inserter(incomingMirrors[h]));
+      std::copy(dest[h].begin(), dest[h].end(),
+                std::back_inserter(incomingMirrors[h]));
     }
     incomingMirrorsPerThread.clear();
     uint64_t offset = base_DistGraph::localToGlobalVector.size();
-
-    uint64_t count = 0;
-    for(uint64_t i=0; i<incomingMirrors.size(); i++) {
-        count += incomingMirrors[i].size();
+    uint64_t count  = 0;
+    for (uint64_t i = 0; i < incomingMirrors.size(); i++) {
+      count += incomingMirrors[i].size();
     }
     uint32_t additionalMirrorCount = count;
     base_DistGraph::localToGlobalVector.resize(
         base_DistGraph::localToGlobalVector.size() + additionalMirrorCount);
 
-    for (uint64_t i=0;i<incomingMirrors.size();i++) {
-            for(uint64_t j=0; j <incomingMirrors[i].size(); j++) {
-               base_DistGraph::localToGlobalVector[offset] = incomingMirrors[i][j];
-               offset++;
-            }
-        }
-<<<<<<< HEAD
-=======
-        I_WR();
-        threadPrefixSums[tid] = count;
-      });
-      // get prefix sums
-      for (unsigned int i = 1; i < threadPrefixSums.size(); i++) {
-        threadPrefixSums[i] += threadPrefixSums[i - 1];
-        I_WR();
-        I_RR();
+    for (uint64_t i = 0; i < incomingMirrors.size(); i++) {
+      for (uint64_t j = 0; j < incomingMirrors[i].size(); j++) {
+        base_DistGraph::localToGlobalVector[offset] = incomingMirrors[i][j];
+        offset++;
       }
-
-      assert(threadPrefixSums.back() == additionalMirrorCount);
-
-      uint32_t startingNodeIndex = base_DistGraph::numOwned;
-      // do actual work, second on_each
-      galois::on_each([&](unsigned tid, unsigned nthreads) {
-        size_t beginNode;
-        size_t endNode;
-        std::tie(beginNode, endNode) =
-            galois::block_range(0u, totalNumNodes, tid, nthreads);
-        // start location to start adding things into prefix sums/vectors
-        uint32_t threadStartLocation = 0;
-        if (tid != 0) {
-          threadStartLocation = threadPrefixSums[tid - 1];
-          I_RR();
-        }
-        uint32_t handledNodes = 0;
-        for (size_t i = beginNode; i < endNode; i++) {
-          I_RR();
-          if (incomingMirrors.test(i)) {
-            I_WR();
-            base_DistGraph::localToGlobalVector[startingNodeIndex +
-                                                threadStartLocation +
-                                                handledNodes] = i;
-            handledNodes++;
-          }
-        }
-      });
     }
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
 
     base_DistGraph::numNodes = base_DistGraph::numOwned + additionalMirrorCount;
-    //Creating Global to Local ID map
+    // Creating Global to Local ID map
     base_DistGraph::globalToLocalMap.reserve(base_DistGraph::numNodes);
     for (unsigned i = 0; i < base_DistGraph::numNodes; i++) {
       base_DistGraph::globalToLocalMap[base_DistGraph::localToGlobalVector[i]] =
@@ -742,21 +639,16 @@ private:
    * @param presentProxies Bitset marking which proxies are present on this host
    * @param proxiesOnOtherHosts Vector to deserialize received bitsets into
    */
-  void communicateProxyInfo(
-      std::vector<std::vector<uint64_t>> presentProxies,
-      std::vector<std::vector<uint64_t>> proxiesOnOtherHosts) {
+  void
+  communicateProxyInfo(std::vector<std::vector<uint64_t>> presentProxies,
+                       std::vector<std::vector<uint64_t>> proxiesOnOtherHosts) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     // Send proxies on this host to other hosts
     for (unsigned h = 0; h < base_DistGraph::numHosts; ++h) {
       if (h != base_DistGraph::id) {
         galois::runtime::SendBuffer bitsetBuffer;
-<<<<<<< HEAD
         galois::runtime::gSerialize(bitsetBuffer, presentProxies[h]);
         I_LC(h, bitsetBuffer.size());
-=======
-        galois::runtime::gSerialize(bitsetBuffer, presentProxies);
-        I_WM(bitsetBuffer.size() / sizeof(uint64_t));
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
         net.sendTagged(h, galois::runtime::evilPhase, bitsetBuffer);
       }
     }
@@ -912,7 +804,8 @@ private:
       uint64_t globalID = base_DistGraph::localToGlobalVector[i];
       I_RR();
       I_WR();
-      assert(graphPartitioner->retrieveMaster(globalID) < base_DistGraph::numHosts);
+      assert(graphPartitioner->retrieveMaster(globalID) <
+             base_DistGraph::numHosts);
       base_DistGraph::mirrorNodes[graphPartitioner->retrieveMaster(globalID)]
           .push_back(globalID);
     }

@@ -75,20 +75,10 @@ protected:
       localEdgesIdxToGlobalNodeID; // map idx in localEdges to global node ID
   std::vector<NodeDataType> localNodes; // nodes in this host, index by local ID
 
-<<<<<<< HEAD
   // global feilds (same on each hosts)
-<<<<<<< HEAD
-=======
-  // global fields (same on each hosts)
-  std::unordered_map<uint64_t, uint64_t> tokenToGlobalNodeID;  // map node token to Global ID
->>>>>>> dd3e7ce00 (fix: typo and TODO)
-  std::vector<uint64_t> nodeOffset;  // each hosts' local ID offset wrt global ID
-  std::vector<uint64_t> globalEdgePrefixSum;  // a prefix sum of degree of each global nodes
-=======
   std::vector<uint64_t> nodeOffset; // each hosts' local ID offset wrt global ID
   std::vector<uint64_t>
       globalEdgePrefixSum; // a prefix sum of degree of each global nodes
->>>>>>> 5901b24b6 (chore: Run clang-format on the repo and add git hooks from gnn branch)
 
   // per thread data struct (will be combined into a single data struct)
   std::vector<std::unordered_map<uint64_t, size_t>>
@@ -316,18 +306,8 @@ protected:
          parsers) {
       I_RR();
       for (const std::string& file : parser->GetFiles()) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-        I_RS();
-=======
-        I_RR(); 
->>>>>>> d18e4e8d0 (fixed all bugs (hopefully))
-        loadGraphFile(file, *parser, segmentsPerHost, nodeCounter,
-=======
         I_RR();
-        loadGraphFile(file, *parser, segmentsPerHost, setEdgeSize, nodeCounter,
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
-                      edgeCounter);
+        loadGraphFile(file, *parser, segmentsPerHost, nodeCounter, edgeCounter);
       }
     }
 
@@ -441,13 +421,13 @@ protected:
       }
       sf /= 2;
 
-      #ifdef GALOIS_INSTRUMENT
+#ifdef GALOIS_INSTRUMENT
       std::sort(cnt_vec.begin(), cnt_vec.begin() + (sf * numHosts));
-      for (uint32_t i = 0; i < (uint32_t) sf * numHosts; i++) {
+      for (uint32_t i = 0; i < (uint32_t)sf * numHosts; i++) {
         I_RR();
         I_WR();
       }
-      #endif
+#endif
     }
     // Determine virtualToPhyMapping values
     for (uint32_t i = 0; i < numHosts; i++) {
@@ -794,7 +774,7 @@ private:
         I_WR();
       }
     }
-    
+
     numNodes = 0;
 
     // send vertex size to other hosts
@@ -838,12 +818,11 @@ private:
     srcGraph.setSize(globalNodeOffset[numHosts - 1] +
                      localNodeSize[numHosts - 1]);
     for (int k = 0; k < 2; k++)
-        I_RR();
+      I_RR();
     I_WR();
 
     increment_evilPhase();
   }
-
 
   /**
    * Exchanges vertex ids to form a global id to local id map before exchanging
@@ -883,7 +862,7 @@ private:
 
       for (uint64_t i = beginNode; i < endNode; ++i) {
         uint64_t src = localEdges[i][0].src;
-        int host = virtualToPhyMapping[src % numVirtualHosts];
+        int host     = virtualToPhyMapping[src % numVirtualHosts];
         threadEdgesToSend[tid][host].push_back((localEdges[i]));
         for (int k = 0; k < 3; k++)
           I_RR();
@@ -899,8 +878,8 @@ private:
           galois::block_range((uint64_t)0, localNodes.size(), tid, nthreads);
 
       for (size_t i = beginNode; i < (endNode); ++i) {
-        int host =
-            virtualToPhyMapping[(localNodes[i].glbid) % (scaleFactor * numHosts)];
+        int host = virtualToPhyMapping[(localNodes[i].glbid) %
+                                       (scaleFactor * numHosts)];
         threadNodesToSend[tid][host].push_back((localNodes[i]));
         for (int k = 0; k < 2; k++)
           I_RR();
@@ -961,23 +940,17 @@ private:
         for (size_t j = beginNode; j < (endNode); ++j) {
           threadMap[tid][NodeData[j].glbid] =
               offset + (tid * (delta)) + j - beginNode;
-<<<<<<< HEAD
-          threadLIDMap[tid][offset + (tid * (delta)) + j - beginNode] = 
+          threadLIDMap[tid][offset + (tid * (delta)) + j - beginNode] =
               NodeData[j].glbid;
-=======
           I_WR();
           I_RR();
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
         }
       });
       for (uint32_t t = 0; t < activeThreads; t++) {
         GIDtoLID.insert(threadMap[t].begin(), threadMap[t].end());
-<<<<<<< HEAD
         LIDtoGID.insert(threadLIDMap[t].begin(), threadLIDMap[t].end());
-=======
         I_WR();
         I_RR();
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
       }
       threadMap.clear();
       NodeData.clear();
@@ -998,35 +971,24 @@ private:
       for (size_t i = beginNode; i < (endNode); ++i) {
         threadMap[tid][nodesToSend[hostID][i].glbid] =
             offset + (tid * (delta)) + i - beginNode;
-<<<<<<< HEAD
-        threadLIDMap[tid][offset + (tid * (delta)) + i - beginNode] = 
+        threadLIDMap[tid][offset + (tid * (delta)) + i - beginNode] =
             nodesToSend[hostID][i].glbid;
-=======
         I_WR();
         I_RR();
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
       }
     });
     for (uint32_t t = 0; t < activeThreads; t++) {
       GIDtoLID.insert(threadMap[t].begin(), threadMap[t].end());
-<<<<<<< HEAD
       LIDtoGID.insert(threadLIDMap[t].begin(), threadLIDMap[t].end());
-=======
       I_WR();
       I_RR();
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
     }
     threadMap.clear();
-<<<<<<< HEAD
     threadLIDMap.clear();
 
     numLocalNodes = GIDtoLID.size();
     localEdges.clear();
-=======
-    
->>>>>>> 6855c8e71 (fix: remove uncessary code)
     nodesToSend.clear();
-
 
     increment_evilPhase();
     // Send Edgelist
@@ -1055,10 +1017,10 @@ private:
       std::vector<std::vector<EdgeDataType>> edgeList;
 
       galois::runtime::gDeserialize(p->second, edgeList);
-      #ifdef GALOIS_INSTRUMENT
-      for (auto l: edgeList)
+#ifdef GALOIS_INSTRUMENT
+      for (auto l : edgeList)
         I_LC(sendingHost, l.size() * sizeof(EdgeDataType));
-      #endif
+#endif
 
       galois::gInfo("[", hostID, "] recv from ", sendingHost,
                     " edgeList size: ", edgeList.size());
@@ -1070,9 +1032,9 @@ private:
             galois::block_range((size_t)0, edgeList.size(), tid, nthreads);
         for (size_t j = beginNode; j < endNode; j++) {
           auto lid = GIDtoLID[edgeList[j][0].src];
-          localEdges[lid].insert(
-              std::end(localEdges[lid]),
-              std::begin(edgeList[j]), std::end(edgeList[j]));
+          localEdges[lid].insert(std::end(localEdges[lid]),
+                                 std::begin(edgeList[j]),
+                                 std::end(edgeList[j]));
           for (int i = 0; i < 3; i++)
             I_RR();
           I_WR();
@@ -1087,10 +1049,9 @@ private:
           (size_t)0, edgesToSend[hostID].size(), tid, nthreads);
       for (size_t j = beginNode; j < endNode; j++) {
         auto lid = GIDtoLID[edgesToSend[hostID][j][0].src];
-        localEdges[lid].insert(
-            std::end(localEdges[lid]),
-            std::begin(edgesToSend[hostID][j]),
-            std::end(edgesToSend[hostID][j]));
+        localEdges[lid].insert(std::end(localEdges[lid]),
+                               std::begin(edgesToSend[hostID][j]),
+                               std::end(edgesToSend[hostID][j]));
         for (int i = 0; i < 4; i++)
           I_RR();
         I_WR();
@@ -1100,143 +1061,6 @@ private:
     increment_evilPhase();
   }
 
-<<<<<<< HEAD
-=======
-  void exchangeTokenID() {
-    auto& net            = galois::runtime::getSystemNetworkInterface();
-    uint64_t this_offset = globalNodeOffset[hostID];
-    galois::do_all(
-        galois::iterate(GIDtoLID.begin(), GIDtoLID.end()),
-        [&](auto& el) { 
-          el.second += this_offset; 
-          I_WR();
-        }, galois::steal());
-    // GIDtoLID.reserve(size);
-
-    for (uint32_t h = 0; h < numHosts; h++) {
-      if (h == hostID)
-        continue;
-      galois::runtime::SendBuffer b;
-      galois::runtime::gSerialize(b, GIDtoLID);
-      net.sendTagged(h, galois::runtime::evilPhase, b);
-      I_WM(GIDtoLID.size());
-    }
-
-    // recv sorted token list from other hosts
-    for (uint32_t h = 0; h < (numHosts - 1); h++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      I_LC(p->first, p->second.size());
-      std::unordered_map<uint64_t, uint32_t> tokensToGID;
-      galois::runtime::gDeserialize(p->second, tokensToGID);
-      GIDtoLID.insert(tokensToGID.begin(), tokensToGID.end());
-      tokensToGID.clear();
-      I_WM(tokensToGID.size());
-    }
-    increment_evilPhase();
-  }
-
-  void
-  exchangeLocalNodeSize(WMDOfflineGraph<NodeDataType, EdgeDataType>& srcGraph) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    globalNodeOffset.resize(numHosts);
-    localNodeSize.resize(numHosts);
-    std::vector<std::vector<uint64_t>> threadNodesToSend(
-        galois::runtime::activeThreads);
-    for (uint32_t i = 0; i < galois::runtime::activeThreads; i++) {
-      threadNodesToSend[i].resize(numHosts, 0);
-      I_WR();
-    }
-    galois::on_each([&](unsigned tid, unsigned nthreads) {
-      uint64_t beginNode;
-      uint64_t endNode;
-      std::tie(beginNode, endNode) = galois::block_range(
-          (uint64_t)0, srcGraph.localNodes.size(), tid, nthreads);
-
-      for (uint64_t i = beginNode; i < endNode; ++i) {
-        int host =
-            virtualToPhyMapping[srcGraph.localNodes[i].id % numVirtualHosts];
-        threadNodesToSend[tid][host]++;
-        I_WR();
-        for (int k = 0; k < 2; k++)
-          I_RR();
-      }
-    });
-    for (uint32_t tid = 0; tid < galois::runtime::activeThreads; tid++) {
-      for (uint32_t h = 0; h < numHosts; h++) {
-        localNodeSize[h] += threadNodesToSend[tid][h];
-        I_RR();
-        I_WR();
-      }
-    }
-    numNodes = 0;
-
-    // send vertex size to other hosts
-    for (uint32_t h = 0; h < numHosts; ++h) {
-      if (h == hostID) {
-        continue;
-      }
-      // serialize size_t
-      galois::runtime::SendBuffer sendBuffer;
-      galois::runtime::gSerialize(sendBuffer, localNodeSize);
-      net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
-      I_WM(localNodeSize.size());
-    }
-
-    // recv node size from other hosts
-    for (uint32_t h = 0; h < numHosts - 1; h++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      std::vector<uint64_t> cnt;
-      // deserialize local_node_size
-      galois::runtime::gDeserialize(p->second, cnt);
-      I_LC(p->first, cnt.size() * sizeof(uint64_t));
-      for (uint32_t i = 0; i < numHosts; i++) {
-        localNodeSize[i] += cnt[i];
-        I_RR();
-        I_WR();
-      }
-    }
-
-    numNodes      = localNodeSize[hostID];
-    numLocalNodes = numNodes;
-    // compute prefix sum to get offset
-    globalNodeOffset[0] = 0;
-    for (size_t h = 1; h < numHosts; h++) {
-      globalNodeOffset[h] = localNodeSize[h - 1] + globalNodeOffset[h - 1];
-      for (int k = 0; k < 2; k++)
-        I_RR();
-      I_WR();
-    }
-    srcGraph.setSize(globalNodeOffset[numHosts - 1] +
-                     localNodeSize[numHosts - 1]);
-    for (int k = 0; k < 2; k++)
-        I_RR();
-    I_WR();
-
-    increment_evilPhase();
-  }
-
-  void relabelEdges(std::vector<std::vector<EdgeDataType>>& localEdges) {
-    galois::do_all(
-        galois::iterate((size_t)0, localEdges.size()),
-        [this, &localEdges](size_t i) {
-          for (uint64_t j = 0; j < (localEdges[i].size()); j++) {
-            localEdges[i][j].src_glbid = GIDtoLID[localEdges[i][0].src];
-            localEdges[i][j].dst_glbid = GIDtoLID[localEdges[i][j].dst];
-            for (int k = 0; k < 4; k++)
-                I_RR();
-            I_WM(2);
-          }
-        },
-        galois::steal());
-  }
-
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
   /**
    * Flatten the 2D vector localEdges into a CSR edge list
    * Will compute edge size and build CSR edge offset mapping
@@ -1346,21 +1170,11 @@ public:
       I_WR();
     }
 
-    // build local buffered graph 
+    // build local buffered graph
     exchangeLocalNodeSize(srcGraph);
     galois::gDebug("[", hostID, "] gatherVerticesAndEdges!");
     gatherVerticesAndEdges(srcGraph.localEdges, srcGraph.localNodes);
-<<<<<<< HEAD
     galois::gDebug("[", hostID, "] ", "flattenEdges!");
-=======
-    galois::gDebug("[", hostID, "] exchangeLocalNodeSize!");
-    exchangeLocalNodeSize(srcGraph);
-    galois::gDebug("[", hostID, "] exchangeTokenID!");
-    exchangeTokenID();
-    galois::gDebug("[", hostID, "] relabelEdges!");
-    relabelEdges(srcGraph.localEdges);
-    galois::gDebug("[", hostID, "] flattenEdges!");
->>>>>>> 6855c8e71 (fix: remove uncessary code)
     flattenEdges(srcGraph.localEdges);
 
     // clean unused data
@@ -1465,51 +1279,29 @@ public:
       I_LC(p->first, p->second.size());
       galois::runtime::gDeserialize(p->second, NodeData);
       galois::do_all(galois::iterate((size_t)0, NodeData.size()),
-                    [this, NodeData, &dstGraph, &globalToLocalMap
+                     [this, NodeData, &dstGraph, &globalToLocalMap
 #ifndef NDEBUG
                       ,
                       &addedData
 #endif
-<<<<<<< HEAD
       ](size_t j) {
-                       dstGraph.getData(
-                           GIDtoLID[NodeData[j].id]) = NodeData[j];
+                       dstGraph.getData(GIDtoLID[NodeData[j].id]) = NodeData[j];
                      });
-=======
-                    ](size_t j) {
-                      dstGraph.getData(
-                          globalToLocalMap[GIDtoLID[NodeData[j].id]]) =
-                          NodeData[j];
-                      for (int k = 0; k < 3; k++)
-                        I_RR();
-                      I_WR();
-                    });
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
       NodeData.clear();
     }
-    galois::do_all(
-        galois::iterate((size_t)0, nodesToSend[hostID].size()),
-        [this, nodesToSend, &dstGraph, &globalToLocalMap
+    galois::do_all(galois::iterate((size_t)0, nodesToSend[hostID].size()),
+                   [this, nodesToSend, &dstGraph, &globalToLocalMap
 #ifndef NDEBUG
-          ,
-          &addedData
+                    ,
+                    &addedData
 #endif
-        ](size_t i) {
-          dstGraph.getData(
-<<<<<<< HEAD
-              GIDtoLID[nodesToSend[hostID][i].id]) = 
-              nodesToSend[hostID][i];
-=======
-            globalToLocalMap[GIDtoLID[nodesToSend[hostID][i].id]]) =
-            nodesToSend[hostID][i];
-          for (int k = 0; k < 2; k++)
-            I_RR();
-          I_WM(2);         
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
+    ](size_t i) {
+                     dstGraph.getData(GIDtoLID[nodesToSend[hostID][i].id]) =
+                         nodesToSend[hostID][i];
 #ifndef NDEBUG
-          addedData++;
+                     addedData++;
 #endif
-        });
+                   });
     nodesToSend.clear();
     nodesToSend.resize(numHosts);
     increment_evilPhase();
@@ -1518,28 +1310,14 @@ public:
     //     uint64_t numNodes = srcGraph.localNodeSize[hostID];
     galois::do_all(
         galois::iterate((uint64_t)0, (uint64_t)numHosts),
-        [this, &nodesToSend, &localNodes, &proxiesOnHosts,
-         globalIDOffset, &dstGraph, &globalToLocalMap](uint64_t i) {
+        [this, &nodesToSend, &localNodes, &proxiesOnHosts, globalIDOffset,
+         &dstGraph, &globalToLocalMap](uint64_t i) {
           if (i != hostID) {
-<<<<<<< HEAD
             I_RR();
             for (uint64_t j = 0; j < proxiesOnHosts[i].size(); j++) {
-              auto& r = dstGraph.getData(
-                  globalToLocalMap[proxiesOnHosts[i][j]]);    
+              auto& r =
+                  dstGraph.getData(globalToLocalMap[proxiesOnHosts[i][j]]);
               nodesToSend[i].push_back(r);
-=======
-            auto& proxiesOnThatHost = proxiesOnHosts[i];
-            for (uint64_t j = 0; j < numNodes; j++) {
-              uint64_t gid = j + globalIDOffset;
-              I_RR();
-              if (proxiesOnThatHost.test(gid)) {
-                IDofNodesToSend[i].push_back(gid);
-                auto& r = dstGraph.getData(globalToLocalMap[gid]);
-                nodesToSend[i].push_back(r);
-                I_RR();
-                I_WM(2);  
-              }
->>>>>>> 73f44af9e (feat: add instrument to wmd graph importer)
             };
           }
         },
@@ -1557,7 +1335,7 @@ public:
       galois::runtime::gSerialize(sendBuffer, proxiesOnHosts[h]);
       galois::gDebug("[", hostID, "] ", "send to ", h,
                      " nodesToSend size: ", nodesToSend[h].size());
-      I_WM(nodesToSend[h].size() + proxiesOnHosts[h].size()); 
+      I_WM(nodesToSend[h].size() + proxiesOnHosts[h].size());
       net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
     }
 
@@ -1674,7 +1452,8 @@ public:
    * @returns number of edges
    */
   uint64_t edgeNum(uint64_t globalNodeID) {
-    return offsets[globalNodeID - globalNodeOffset[hostID] + 1] - offsets[globalNodeID - globalNodeOffset[hostID]];
+    return offsets[globalNodeID - globalNodeOffset[hostID] + 1] -
+           offsets[globalNodeID - globalNodeOffset[hostID]];
   }
 
   /**
@@ -1688,8 +1467,9 @@ public:
   std::vector<uint64_t> edgeLocalDst(uint64_t globalNodeID) {
     std::vector<uint64_t> dst;
     auto end = offsets[globalNodeID - globalNodeOffset[hostID] + 1];
-    for (auto itr = offsets[globalNodeID - globalNodeOffset[hostID]]; itr != end; ++itr) {
-        dst.push_back(edges[itr].dst);
+    for (auto itr = offsets[globalNodeID - globalNodeOffset[hostID]];
+         itr != end; ++itr) {
+      dst.push_back(edges[itr].dst);
     }
     return dst;
   }
