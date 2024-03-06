@@ -293,13 +293,13 @@ protected:
 
   template <bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag,
-                   typename std::enable_if<!_A1&& !_A2>::type* = 0) {
+                   typename std::enable_if<!_A1 && !_A2>::type* = 0) {
     galois::runtime::acquire(&nodeData[N], mflag);
   }
 
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
   void acquireNode(GraphNode N, MethodFlag mflag,
-                   typename std::enable_if<_A1&& !_A2>::type* = 0) {
+                   typename std::enable_if<_A1 && !_A2>::type* = 0) {
     this->outOfLineAcquire(getId(N), mflag);
   }
 
@@ -338,7 +338,7 @@ protected:
   template <bool _A1 = EdgeData::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph&, typename FileGraph::edge_iterator nn,
-                          typename std::enable_if<_A1&& !_A2>::type* = 0) {
+                          typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edgeData.set(*nn, {});
   }
 
@@ -594,15 +594,9 @@ public:
     edgeIndData[src].first  = edgeStart;
     edgeIndData[src].second = edgeStart + num_dst + orig_deg;
 
-    if (!keep_size)
+    if (!keep_size) {
       numEdges.fetch_add(num_dst, std::memory_order_relaxed);
-#ifdef GRAPH_PROFILE
-    this->local_rnd_write_counts  += 1;
-    this->local_rnd_write_bytes   += 8;
-#endif
-
-    numEdges.fetch_add(num_dst, std::memory_order_relaxed);
-
+    }
     prefixValid = false;
   }
 
@@ -975,34 +969,8 @@ public:
       edgeIndData.allocateBlocked(maxNodes);
       edgeDst.allocateBlocked(maxEdges);
       edgeData.allocateBlocked(maxEdges);
-      pfxsum.allocateInterleaved(maxNodes);
+      prefixSumCache.allocateBlocked(maxNodes);
       this->outOfLineAllocateBlocked(maxNodes);
-    } else {
-      nodeData.allocateInterleaved(maxNodes);
-      edgeIndData.allocateInterleaved(maxNodes);
-      edgeDst.allocateInterleaved(maxEdges);
-      edgeData.allocateInterleaved(maxEdges);
-      pfxsum.allocateInterleaved(maxNodes);
-      this->outOfLineAllocateInterleaved(maxNodes);
-    }
-    resetPrefixSum();
-  }
-
-  void destroyAndAllocateFrom(uint64_t nNodes, uint64_t nEdges) {
-    numNodes = nNodes;
-    numEdges = 0;
-    edgeEnd  = 0;
-    maxEdges = nEdges;
-    maxNodes = nNodes;
-
-    deallocate();
-    if (UseNumaAlloc) {
-      nodeData.allocateBlocked(numNodes);
-      edgeIndData.allocateBlocked(numNodes);
-      edgeDst.allocateBlocked(numEdges);
-      edgeData.allocateBlocked(numEdges);
-      prefixSumCache.allocateBlocked(numNodes);
-      this->outOfLineAllocateBlocked(numNodes);
     } else {
       nodeData.allocateInterleaved(maxNodes);
       edgeIndData.allocateInterleaved(maxNodes);
@@ -1017,7 +985,7 @@ public:
   void destroyAndAllocateFrom(uint64_t nNodes, uint64_t nEdges) {
     numNodes = nNodes;
     numEdges = 0;
-    edgeEnd = 0;
+    edgeEnd  = 0;
     maxEdges = nEdges;
     maxNodes = nNodes;
 

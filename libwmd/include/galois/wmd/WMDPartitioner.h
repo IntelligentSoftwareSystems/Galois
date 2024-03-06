@@ -10,7 +10,7 @@
 #define _WMD_PARTITIONER_H
 
 #include "galois/Galois.h"
-#include "galois/graphs/DistributedGraph.h"
+#include "galois/graphs/DistributedLocalGraph.h"
 #include "galois/DReducible.h"
 
 #include "WMDGraph.h"
@@ -33,7 +33,7 @@ namespace graphs {
  * @warning not meant for public use + not fully documented yet
  */
 template <typename NodeTy, typename EdgeTy, typename Partitioner>
-class WMDGraph : public DistGraph<NodeTy, EdgeTy> {
+class WMDGraph : public DistLocalGraph<NodeTy, EdgeTy> {
 
   //! size used to buffer edge sends during partitioning
   constexpr static unsigned edgePartitionSendBufSize = 8388608;
@@ -90,7 +90,7 @@ class WMDGraph : public DistGraph<NodeTy, EdgeTy> {
 
 public:
   //! typedef for base DistGraph class
-  using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
+  using base_DistGraph = DistLocalGraph<NodeTy, EdgeTy>;
 
   /**
    * Returns edges owned by this graph (i.e. read).
@@ -649,15 +649,15 @@ private:
         galois::runtime::SendBuffer bitsetBuffer;
         galois::runtime::gSerialize(bitsetBuffer, presentProxies[h]);
         I_LC(h, bitsetBuffer.size());
-        net.sendTagged(h, galois::runtime::evilPhase, bitsetBuffer);
+        net.sendTagged(h, galois::runtime::evilPhase, std::move(bitsetBuffer));
       }
     }
 
     // receive loop
     for (unsigned h = 0; h < net.Num - 1; h++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       uint32_t sendingHost = p->first;
       // deserialize proxiesOnOtherHosts

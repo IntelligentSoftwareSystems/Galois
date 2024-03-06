@@ -815,10 +815,10 @@ void gDeserializeObj(
 
 template <typename T1, typename T2>
 void gDeserializeObj(DeSerializeBuffer& buf, std::unordered_map<T1, T2>& data) {
-  while (!buf.empty()) {
+  while (buf.size() > 0) {
     std::pair<T1, T2> i;
     gDeserialize(buf, i.first, i.second);
-    if (buf.getOffset() > buf.size()) {
+    if (buf.size() <= 0) {
       break;
     }
     data[i.first] = i.second;

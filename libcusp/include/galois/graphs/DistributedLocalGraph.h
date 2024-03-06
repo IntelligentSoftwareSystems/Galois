@@ -20,8 +20,8 @@
 /**
  * @file DistributedLocalGraph.h
  *
- * Contains the implementation for DistGraph. Command line argument definitions
- * are found in DistributedGraph.cpp.
+ * Contains the implementation for DistLocalGraph. Command line argument
+ * definitions are found in DistributedGraph.cpp.
  */
 
 #ifndef _GALOIS_DISTRIBUTED_LOCAL_GRAPH_H
@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <fstream>
 
+#include "galois/graphs/DistributedGraph.h"
 #include "galois/graphs/LS_LC_CSR_64_Graph.h"
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/DistStats.h"
@@ -42,20 +43,9 @@
 
 namespace galois {
 namespace graphs {
-/**
- * Enums specifying how masters are to be distributed among hosts.
- */
-enum MASTERS_DISTRIBUTION {
-  //! balance nodes
-  BALANCED_MASTERS,
-  //! balance edges
-  BALANCED_EDGES_OF_MASTERS,
-  //! balance nodes and edges
-  BALANCED_MASTERS_AND_EDGES
-};
 
 /**
- * Base DistGraph class that all distributed graphs extend from.
+ * Base DistLocalGraph class that all distributed graphs extend from.
  *
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
@@ -92,7 +82,7 @@ private:
   std::vector<NodeRangeType> specificRangesIn;
 
 protected:
-  //! The internal graph used by DistGraph to represent the graph
+  //! The internal graph used by DistLocalGraph to represent the graph
   GraphTy graph;
 
   //! Marks if the graph is transposed or not.
@@ -256,14 +246,14 @@ private:
       for (unsigned d = 0; d < DecomposeFactor; ++d) {
         galois::runtime::gSerialize(b, gid2host[id + d * numHosts]);
       }
-      net.sendTagged(h, galois::runtime::evilPhase, b);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
     }
     net.flush();
     unsigned received = 1;
     while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
@@ -326,14 +316,14 @@ private:
         continue;
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, gid2host[id]);
-      net.sendTagged(h, galois::runtime::evilPhase, b);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
     }
     net.flush();
     unsigned received = 1;
     while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
@@ -443,14 +433,14 @@ protected:
         continue;
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, gid2host[id]);
-      net.sendTagged(h, galois::runtime::evilPhase, b);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
     }
     net.flush();
     unsigned received = 1;
     while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
@@ -497,12 +487,12 @@ public:
   using edge_iterator = typename GraphTy::edge_iterator;
 
   /**
-   * Constructor for DistGraph. Initializes metadata fields.
+   * Constructor for DistLocalGraph. Initializes metadata fields.
    *
    * @param host host number that this graph resides on
    * @param numHosts total number of hosts in the currently executing program
    */
-  DistGraph(unsigned host, unsigned numHosts)
+  DistLocalGraph(unsigned host, unsigned numHosts)
       : transposed(false), id(host), numHosts(numHosts) {
     mirrorNodes.resize(numHosts);
     numGlobalNodes = 0;
@@ -538,7 +528,7 @@ private:
   }
 
 public:
-  virtual ~DistGraph() {}
+  virtual ~DistLocalGraph() {}
   //! Determines which host has the master for a particular node
   //! @returns Host id of node in question
   inline unsigned getHostID(uint64_t gid) const { return getHostIDImpl(gid); }
@@ -878,7 +868,7 @@ public:
    * Deallocates underlying LC CSR Graph
    */
   void deallocate() {
-    galois::gDebug("Deallocating CSR in DistGraph");
+    galois::gDebug("Deallocating CSR in DistLocalGraph");
     graph.deallocate();
   }
 
@@ -896,7 +886,8 @@ public:
 };
 
 template <typename NodeTy, typename EdgeTy>
-constexpr const char* const galois::graphs::DistGraph<NodeTy, EdgeTy>::GRNAME;
+constexpr const char* const
+    galois::graphs::DistLocalGraph<NodeTy, EdgeTy>::GRNAME;
 } // end namespace graphs
 } // end namespace galois
 

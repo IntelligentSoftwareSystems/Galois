@@ -81,12 +81,12 @@ int main(int argc, char* argv[]) {
   if (net.ID != 0) { // send token and degree pairs to host 0
     galois::runtime::SendBuffer sendBuffer;
     galois::runtime::gSerialize(sendBuffer, tokenAndEdges);
-    net.sendTagged(0, galois::runtime::evilPhase, sendBuffer);
+    net.sendTagged(0, galois::runtime::evilPhase, std::move(sendBuffer));
   } else { // recv node range from other hosts
     for (size_t i = 0; i < net.Num - 1; i++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
 
       std::vector<std::pair<uint64_t, std::vector<uint64_t>>>

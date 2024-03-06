@@ -365,15 +365,15 @@ protected:
       I_WM(edgeCnt.size());
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, edgeCnt);
-      net.sendTagged(i, galois::runtime::evilPhase, b);
+      net.sendTagged(i, galois::runtime::evilPhase, std::move(b));
     }
     // Receive edgeCnt
     for (uint32_t h = 0; h < (numHosts - 1); h++) {
       std::vector<uint64_t> recvChunkCounts;
 
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       galois::runtime::gDeserialize(p->second, recvChunkCounts);
       I_LC(p->first, recvChunkCounts.size() * sizeof(uint64_t));
@@ -536,9 +536,9 @@ protected:
         }
 
         galois::runtime::SendBuffer b;
-        galois::runtime::gSerialize(b, sendBuffer);
+        galois::runtime::gSerialize(b, std::move(sendBuffer));
         I_LC(h, b.size());
-        net.sendTagged(h, galois::runtime::evilPhase, b);
+        net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
       }
     }
 
@@ -558,9 +558,9 @@ protected:
     // recv node degrees and its global ID from other hosts
     // build a list of degree of all global nodes on `globalEdgePrefixSum`
     for (uint32_t h = 0; h < numHosts - 1; h++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       // deserialize
       std::vector<uint64_t> recvNodeDegree;
@@ -785,14 +785,14 @@ private:
       // serialize size_t
       galois::runtime::SendBuffer sendBuffer;
       galois::runtime::gSerialize(sendBuffer, localNodeSize);
-      net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(sendBuffer));
       I_WM(localNodeSize.size());
     }
 
     for (uint32_t h = 0; h < numHosts - 1; h++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       std::vector<uint64_t> cnt;
       // deserialize local_node_size
@@ -912,15 +912,15 @@ private:
         continue;
       galois::runtime::SendBuffer sendBuffer;
       galois::runtime::gSerialize(sendBuffer, nodesToSend[h]);
-      net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(sendBuffer));
       I_WM(nodesToSend[h].size());
     }
 
     // Collect node data received from other hosts
     for (uint32_t i = 0; i < (numHosts - 1); i++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       std::vector<NodeDataType> NodeData;
       galois::runtime::gDeserialize(p->second, NodeData);
@@ -999,7 +999,7 @@ private:
       galois::runtime::gSerialize(sendBuffer, edgesToSend[h]);
       galois::gInfo("[", hostID, "] ", "send to ", h,
                     " edgesToSend size: ", edgesToSend[h].size());
-      net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(sendBuffer));
       I_WM(edgesToSend[h].size());
     }
 
@@ -1008,9 +1008,9 @@ private:
 
     // Receiving edges from other hosts and populating edgelist
     for (uint32_t h = 0; h < (numHosts - 1); h++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       uint32_t sendingHost = p->first;
 
@@ -1264,16 +1264,16 @@ public:
         continue;
       galois::runtime::SendBuffer sendBuffer;
       galois::runtime::gSerialize(sendBuffer, nodesToSend[h]);
-      net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(sendBuffer));
       I_WM(nodesToSend[h].size());
     }
 #ifndef NDEBUG
     std::atomic<uint64_t> addedData{0};
 #endif
     for (uint32_t i = 0; i < (numHosts - 1); i++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       std::vector<NodeDataType> NodeData;
       I_LC(p->first, p->second.size());
@@ -1336,15 +1336,15 @@ public:
       galois::gDebug("[", hostID, "] ", "send to ", h,
                      " nodesToSend size: ", nodesToSend[h].size());
       I_WM(nodesToSend[h].size() + proxiesOnHosts[h].size());
-      net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+      net.sendTagged(h, galois::runtime::evilPhase, std::move(sendBuffer));
     }
 
     nodesToSend.clear();
     // recive nodes from other hosts
     for (uint32_t i = 0; i < (numHosts - 1); i++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       uint32_t sendingHost = p->first;
 
