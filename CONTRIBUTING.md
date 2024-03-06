@@ -6,17 +6,12 @@ tools like `clang-format` manually.
 
 Code should be clear and documented where needed.
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 ## Setup
 
 Users can run `make docker-image` to setup all dependecies needed for
 `pando-galois`.  After creating the image it can be run via `make docker`.
 And for first time cmake users can run `make run-cmake`.
 
-=======
->>>>>>> 5901b24b6 (chore: Run clang-format on the repo and add git hooks from gnn branch)
-=======
 # Instrumentation
 
 This section pertains to enabling and instrumenting memory accesses for
@@ -56,7 +51,6 @@ I_CLEAR()
 I_LC(REMOTE_HOST, BYTES)
 ```
 
->>>>>>> 43672aff5 (chore: Add instrument.h header file to libwmd)
 ## Tools
 
 ### [asdf](https://asdf-vm.com)
