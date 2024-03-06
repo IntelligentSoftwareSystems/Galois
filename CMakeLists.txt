@@ -6,19 +6,13 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
 
 include(GNUInstallDirs)
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 if(STACK_CAPTURE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -finstrument-functions")
   set(INSTRUMENT_EXCLUDE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/libgalois/include/galois/runtime/StackTracer.h")
   set(INSTRUMENT_EXCLUDE_FILE "${INSTRUMENT_EXCLUDE_FILE},/usr/include/c++/11/sstream")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -finstrument-functions-exclude-file-list=${INSTRUMENT_EXCLUDE_FILE}")
 endif(STACK_CAPTURE)
->>>>>>> deb11e279 (Added StackTracer to CMakeLists)
 
-=======
->>>>>>> 8e396b028 (Fixed CMakeLists.txt for Stack_Capture)
 file(STRINGS config/version.txt GALOIS_VERSION)
 string(REGEX REPLACE "[ \t\n]" "" GALOIS_VERSION ${GALOIS_VERSION})
 string(REGEX REPLACE "([0-9]+)\\.([0-9]+)\\.([0-9]+)" "\\1" GALOIS_VERSION_MAJOR ${GALOIS_VERSION})
@@ -270,13 +264,10 @@ if (GALOIS_ENABLE_GPU)
     string(REPLACE "." "" GENCODE ${GENCODE})
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=compute_${GENCODE},code=sm_${GENCODE}>")
   endforeach()
-<<<<<<< HEAD
-=======
 
   # This is necessary to allow building for CUDA 11.x (where CUB is bundled) and earlier versions (where CUB is not included)
   add_definitions(-DTHRUST_IGNORE_CUB_VERSION_CHECK)
 
->>>>>>> 191e9ff91 (Fix 0-initialization of elements in a multiple_sum structure on GPU)
   add_subdirectory(libgpu)
 
   if (USE_DEEPGALOIS)
