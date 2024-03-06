@@ -1,12 +1,9 @@
-<<<<<<< HEAD
 SHELL := /bin/bash
 
 IMAGE_NAME := pando-galois
 VERSION := 0.0.1
 CONTAINER_SRC_DIR := /pando-galois
 
-=======
->>>>>>> 5901b24b6 (chore: Run clang-format on the repo and add git hooks from gnn branch)
 dependencies: dependencies-asdf
 
 dependencies-asdf:
@@ -27,7 +24,6 @@ hooks:
 
 pre-commit:
 	@pre-commit run -a
-<<<<<<< HEAD
 
 docker-image:
 	@docker --context default build --build-arg VERSION=${VERSION} \
@@ -43,5 +39,3 @@ docker:
 
 run-cmake:
 	@cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUSE_MKL_BLAS=ON -DGALOIS_ENABLE_DIST=ON
-=======
->>>>>>> 5901b24b6 (chore: Run clang-format on the repo and add git hooks from gnn branch)
