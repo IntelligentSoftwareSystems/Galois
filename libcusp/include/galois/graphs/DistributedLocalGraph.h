@@ -18,20 +18,19 @@
  */
 
 /**
- * @file DistributedGraph.h
+ * @file DistributedLocalGraph.h
  *
  * Contains the implementation for DistGraph. Command line argument definitions
  * are found in DistributedGraph.cpp.
  */
 
-#ifndef _GALOIS_DIST_HGRAPH_H_
-#define _GALOIS_DIST_HGRAPH_H_
+#ifndef _GALOIS_DISTRIBUTED_LOCAL_GRAPH_H
+#define _GALOIS_DISTRIBUTED_LOCAL_GRAPH_H
 
 #include <unordered_map>
 #include <fstream>
 
-#include "galois/graphs/LC_CSR_Graph.h"
-#include "galois/graphs/LC_CSR_CSC_Graph.h"
+#include "galois/graphs/LS_LC_CSR_64_Graph.h"
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/graphs/OfflineGraph.h"
@@ -61,16 +60,13 @@ enum MASTERS_DISTRIBUTION {
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
  */
-template <typename NodeTy, typename EdgeTy, typename NodeIndexTy = uint32_t,
-          typename EdgeIndexTy = uint64_t>
-class DistGraph {
+template <typename NodeTy, typename EdgeTy>
+class DistLocalGraph {
 private:
   //! Graph name used for printing things
   constexpr static const char* const GRNAME = "dGraph";
 
-  using GraphTy =
-      galois::graphs::LC_CSR_CSC_Graph<NodeTy, EdgeTy, false, true, false,
-                                       false, EdgeTy, NodeIndexTy, EdgeIndexTy>;
+  using GraphTy = galois::graphs::LS_LC_CSR_64_Graph<NodeTy, EdgeTy, true>;
 
   // vector for determining range objects for master nodes + nodes
   // with edges (which includes masters)
@@ -260,14 +256,14 @@ private:
       for (unsigned d = 0; d < DecomposeFactor; ++d) {
         galois::runtime::gSerialize(b, gid2host[id + d * numHosts]);
       }
-      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
+      net.sendTagged(h, galois::runtime::evilPhase, b);
     }
     net.flush();
     unsigned received = 1;
     while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase);
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
@@ -330,210 +326,14 @@ private:
         continue;
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, gid2host[id]);
-      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
+      net.sendTagged(h, galois::runtime::evilPhase, b);
     }
     net.flush();
     unsigned received = 1;
     while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase);
-      } while (!p);
-      assert(p->first != id);
-      auto& b = p->second;
-      galois::runtime::gDeserialize(b, gid2host[p->first]);
-      ++received;
-    }
-    increment_evilPhase();
-  }
-
-  /**
-   * Given the number of global nodes, compute the masters for each node by
-   * evenly (or unevenly as specified by scale factor)
-   * blocking the nodes off to assign to each host. Considers
-   * ONLY nodes and not edges.
-   *
-   * @param numGlobalNodes The number of global nodes to divide
-   * @param scalefactor A vector that specifies if a particular host
-   * should have more or less than other hosts
-   * @param DecomposeFactor Specifies how decomposed the blocking
-   * of nodes should be. For example, a factor of 2 will make 2 blocks
-   * out of 1 block had the decompose factor been set to 1.
-   */
-  void computeMastersBlockedNodes(uint64_t numGlobalNodes,
-                                  const std::vector<unsigned>& scalefactor,
-                                  unsigned DecomposeFactor = 1) {
-    uint64_t numNodes_to_divide = numGlobalNodes;
-    if (scalefactor.empty() || (numHosts * DecomposeFactor == 1)) {
-      for (unsigned i = 0; i < numHosts * DecomposeFactor; ++i)
-        gid2host.push_back(galois::block_range(uint64_t{0}, numNodes_to_divide,
-                                               i, numHosts * DecomposeFactor));
-      return;
-    }
-
-    // TODO: not compatible with DecomposeFactor.
-    assert(scalefactor.size() == numHosts);
-
-    unsigned numBlocks = 0;
-
-    for (unsigned i = 0; i < numHosts; ++i) {
-      numBlocks += scalefactor[i];
-    }
-
-    std::vector<std::pair<uint64_t, uint64_t>> blocks;
-    for (unsigned i = 0; i < numBlocks; ++i) {
-      blocks.push_back(
-          galois::block_range(uint64_t{0}, numNodes_to_divide, i, numBlocks));
-    }
-
-    std::vector<unsigned> prefixSums;
-    prefixSums.push_back(0);
-
-    for (unsigned i = 1; i < numHosts; ++i) {
-      prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
-    }
-
-    for (unsigned i = 0; i < numHosts; ++i) {
-      unsigned firstBlock = prefixSums[i];
-      unsigned lastBlock  = prefixSums[i] + scalefactor[i] - 1;
-      gid2host.push_back(
-          std::make_pair(blocks[firstBlock].first, blocks[lastBlock].second));
-    }
-  }
-
-  /**
-   * Given the number of global nodes and edges,
-   * compute the masters for each node by
-   * evenly (or unevenly as specified by scale factor)
-   * blocking the nodes off to assign to each host while taking
-   * into consideration the only edges of the node to get
-   * even blocks.
-   *
-   * @param numGlobalNodes The number of global nodes to divide
-   * @param numGlobalEdges The number of global edges to divide
-   * @param outIndices A complete outgoing edge range array of CSR to calculate
-   * range
-   * @param scalefactor A vector that specifies if a particular host
-   * should have more or less than other hosts
-   * @param DecomposeFactor Specifies how decomposed the blocking
-   * of nodes should be. For example, a factor of 2 will make 2 blocks
-   * out of 1 block had the decompose factor been set to 1.
-   */
-  void computeMastersBalancedEdges(uint64_t numGlobalNodes,
-                                   uint64_t numGlobalEdges,
-                                   uint64_t* outIndices,
-                                   const std::vector<unsigned>& scalefactor,
-                                   uint32_t edgeWeight,
-                                   unsigned DecomposeFactor = 1) {
-    if (edgeWeight == 0) {
-      edgeWeight = 1;
-    }
-
-    auto& net = galois::runtime::getSystemNetworkInterface();
-
-    gid2host.resize(numHosts * DecomposeFactor);
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      // TODO(hc):
-      auto r = galois::graphs::divideNodesBinarySearch(
-          numGlobalNodes, numGlobalEdges, 0, edgeWeight, (id + d * numHosts),
-          numHosts * DecomposeFactor, outIndices, scalefactor);
-      gid2host[id + d * numHosts].first  = *(r.first.first);
-      gid2host[id + d * numHosts].second = *(r.first.second);
-    }
-
-    for (unsigned h = 0; h < numHosts; ++h) {
-      if (h == id) {
-        continue;
-      }
-      galois::runtime::SendBuffer b;
-      for (unsigned d = 0; d < DecomposeFactor; ++d) {
-        galois::runtime::gSerialize(b, gid2host[id + d * numHosts]);
-      }
-      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
-    }
-    net.flush();
-    unsigned received = 1;
-    while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase);
-      } while (!p);
-      assert(p->first != id);
-      auto& b = p->second;
-      for (unsigned d = 0; d < DecomposeFactor; ++d) {
-        galois::runtime::gDeserialize(b, gid2host[p->first + d * numHosts]);
-      }
-      ++received;
-    }
-    increment_evilPhase();
-
-#ifndef NDEBUG
-    // TODO(hc):
-    for (unsigned h = 0; h < numHosts; h++) {
-      if (h == 0) {
-        assert(gid2host[h].first == 0);
-      } else if (h == numHosts - 1) {
-        assert(gid2host[h].first == gid2host[h - 1].second);
-        assert(gid2host[h].second == numGlobalNodes);
-      } else {
-        assert(gid2host[h].first == gid2host[h - 1].second);
-        assert(gid2host[h].second == gid2host[h + 1].first);
-      }
-    }
-#endif
-  }
-
-  /**
-   * Given the number of global nodes and edges,
-   * compute the masters for each node by evenly
-   * (or unevenly as specified by scale factor)
-   * blocking the nodes off to assign to each host while taking
-   * into consideration the edges of the node AND the node itself.
-   *
-   * @param numGlobalNodes The number of global nodes to divide
-   * @param numGlobalEdges The number of global edges to divide
-   * @param outIndices A complete outgoing edge range array of CSR to calculate
-   * range
-   * @param scalefactor A vector that specifies if a particular host
-   * should have more or less than other hosts
-   * @param DecomposeFactor Specifies how decomposed the blocking
-   * of nodes should be. For example, a factor of 2 will make 2 blocks
-   * out of 1 block had the decompose factor been set to 1. Ignored
-   * in this function currently.
-   *
-   * @todo make this function work with decompose factor
-   */
-  void computeMastersBalancedNodesAndEdges(
-      uint64_t numGlobalNodes, uint64_t numGlobalEdges, uint64_t* outIndices,
-      const std::vector<unsigned>& scalefactor, uint32_t nodeWeight,
-      uint32_t edgeWeight, unsigned) {
-    if (nodeWeight == 0) {
-      nodeWeight = numGlobalEdges / numGlobalNodes; // average degree
-    }
-    if (edgeWeight == 0) {
-      edgeWeight = 1;
-    }
-
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    gid2host.resize(numHosts);
-    auto r = galois::graphs::divideNodesBinarySearch(
-        numGlobalNodes, numGlobalEdges, nodeWeight, edgeWeight, id, numHosts,
-        outIndices, scalefactor);
-    gid2host[id].first  = *r.first.first;
-    gid2host[id].second = *r.first.second;
-    for (unsigned h = 0; h < numHosts; ++h) {
-      if (h == id)
-        continue;
-      galois::runtime::SendBuffer b;
-      galois::runtime::gSerialize(b, gid2host[id]);
-      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
-    }
-    net.flush();
-    unsigned received = 1;
-    while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase);
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
@@ -590,68 +390,10 @@ protected:
     galois::runtime::reportStatCond_Tmax<MORE_DIST_STATS>(
         GRNAME, "MasterDistTime", timer.get());
 
-    galois::gDebug(
+    galois::gPrint(
         "[", id, "] Master distribution time : ", timer.get_usec() / 1000000.0f,
         " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
-        " seeks (", g.num_bytes_read() / (float)timer.get_usec(), " MBPS)");
-    return numNodes_to_divide;
-  }
-
-  /**
-   * Wrapper call that will call into more specific compute masters
-   * functions that compute masters based on nodes, edges, or both.
-   *
-   * @param masters_distribution method of masters distribution to use
-   * @param numGlobalNodes The number of global nodes to divide
-   * @param numGlobalEdges The number of global edges to divide
-   * @param outIndices A complete outgoing edge range array of CSR to calculate
-   * range
-   * @param scalefactor A vector that specifies if a particular host
-   * should have more or less than other hosts
-   * @param nodeWeight weight to give nodes when computing balance
-   * @param edgeWeight weight to give edges when computing balance
-   * @param DecomposeFactor Specifies how decomposed the blocking
-   * of nodes should be. For example, a factor of 2 will make 2 blocks
-   * out of 1 block had the decompose factor been set to 1.
-   */
-  uint64_t computeMasters(MASTERS_DISTRIBUTION masters_distribution,
-                          uint64_t numGlobalNodes, uint64_t numGlobalEdges,
-                          uint64_t* outIndices,
-                          const std::vector<unsigned>& scalefactor,
-                          uint32_t nodeWeight = 0, uint32_t edgeWeight = 0,
-                          unsigned DecomposeFactor = 1) {
-    galois::Timer timer;
-    timer.start();
-    uint64_t numNodes_to_divide = numGlobalNodes;
-
-    // compute masters for all nodes
-    switch (masters_distribution) {
-    case BALANCED_MASTERS:
-      computeMastersBlockedNodes(numGlobalNodes, scalefactor, DecomposeFactor);
-      break;
-    case BALANCED_MASTERS_AND_EDGES:
-      computeMastersBalancedNodesAndEdges(numGlobalNodes, numGlobalEdges,
-                                          outIndices, scalefactor, nodeWeight,
-                                          edgeWeight, DecomposeFactor);
-      break;
-    case BALANCED_EDGES_OF_MASTERS:
-    default:
-      computeMastersBalancedEdges(numGlobalNodes, numGlobalEdges, outIndices,
-                                  scalefactor, edgeWeight, DecomposeFactor);
-      break;
-    }
-
-    timer.stop();
-
-    galois::runtime::reportStatCond_Tmax<MORE_DIST_STATS>(
-        GRNAME, "MasterDistTime", timer.get());
-
-#if 0
-    galois::gDebug(
-        "[", id, "] Master distribution time : ", timer.get_usec() / 1000000.0f,
-        " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
-        " seeks (", g.num_bytes_read() / (float)timer.get_usec(), " MBPS)");
-#endif
+        " seeks (", g.num_bytes_read() / (float)timer.get_usec(), " MBPS)\n");
     return numNodes_to_divide;
   }
 
@@ -701,14 +443,14 @@ protected:
         continue;
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, gid2host[id]);
-      net.sendTagged(h, galois::runtime::evilPhase, std::move(b));
+      net.sendTagged(h, galois::runtime::evilPhase, b);
     }
     net.flush();
     unsigned received = 1;
     while (received < numHosts) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase);
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
@@ -797,9 +539,6 @@ private:
 
 public:
   virtual ~DistGraph() {}
-
-  unsigned GetLIDHost(uint64_t lid) const { return getHostIDImpl(getGID(lid)); }
-
   //! Determines which host has the master for a particular node
   //! @returns Host id of node in question
   inline unsigned getHostID(uint64_t gid) const { return getHostIDImpl(gid); }
@@ -895,6 +634,11 @@ public:
   inline edge_iterator edge_end(GraphNode N) {
     return graph.edge_end(N, galois::MethodFlag::UNPROTECTED);
   }
+
+  /**
+   * Return the degree of the edge in the local graph
+   **/
+  inline uint64_t localDegree(GraphNode N) { return graph.getDegree(N); }
 
   /**
    * Returns an iterable object over the edges of a particular node in the
@@ -1003,51 +747,6 @@ public:
     return IDs;
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  // for in edges
-  //////////////////////////////////////////////////////////////////////////////
-
-  //! Construct the transpose graph for the partitioned graph
-  void ConstructIncomingEdges() { graph.constructIncomingEdges(); }
-
-  /**
-   * Get the edge data for a particular edge in the graph.
-   *
-   * @param ni edge to get the data of
-   * @param mflag access flag for edge data
-   * @returns The edge data for the requested edge
-   */
-  typename GraphTy::edge_data_reference
-  GetInEdgeData(edge_iterator ni,
-                galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    return graph.getInEdgeData(ni, mflag);
-  }
-
-  GraphNode GetInEdgeDest(edge_iterator ni) { return graph.getInEdgeDst(ni); }
-
-  edge_iterator in_edge_begin(GraphNode N) {
-    return graph.in_edge_begin(N, galois::MethodFlag::UNPROTECTED);
-  }
-
-  edge_iterator in_edge_end(GraphNode N) {
-    return graph.in_edge_end(N, galois::MethodFlag::UNPROTECTED);
-  }
-
-  galois::runtime::iterable<galois::NoDerefIterator<edge_iterator>>
-  in_edges(GraphNode N) {
-    return galois::graphs::internal::make_no_deref_range(in_edge_begin(N),
-                                                         in_edge_end(N));
-  }
-
-  //! Return corresponding out-edge index for an in-edge
-  size_t InEdgeToOutEdge(edge_iterator ni) const {
-    return graph.InEdgeToOutEdge(ni);
-  }
-
-  //////////////////////////////////////////////////////////////////////////////
-  // end in edges
-  //////////////////////////////////////////////////////////////////////////////
-
 protected:
   /**
    * Uses a pre-computed prefix sum to determine division of nodes among
@@ -1079,9 +778,11 @@ protected:
                withEdgeRanges.size() != 0) {
       masterRanges = withEdgeRanges;
     } else {
+      galois::gDebug("Manually det. master thread ranges");
       masterRanges = galois::graphs::determineUnitRangesFromGraph(
           graph, galois::runtime::activeThreads, beginMaster,
-          beginMaster + numOwned, 0);
+          beginMaster + numOwned, 0,
+          (galois::graphs::is_LS_LC_CSR_64_Graph<decltype(graph)>::value == 1));
     }
   }
 
@@ -1104,6 +805,7 @@ protected:
                masterRanges.size() != 0) {
       withEdgeRanges = masterRanges;
     } else {
+      galois::gDebug("Manually det. with edges thread ranges");
       withEdgeRanges = galois::graphs::determineUnitRangesFromGraph(
           graph, galois::runtime::activeThreads, 0, numNodesWithEdges, 0);
     }
@@ -1149,6 +851,12 @@ protected:
    */
   void edgesEqualMasters() { specificRanges[2] = specificRanges[1]; }
 
+  void recalculateG2LMap() {
+    for (uint64_t i = 0; i < localToGlobalVector.size(); i++) {
+      globalToLocalMap[localToGlobalVector[i]] = i;
+    }
+  }
+
 public:
   /**
    * Write the local LC_CSR graph to the file on a disk.
@@ -1169,7 +877,10 @@ public:
   /**
    * Deallocates underlying LC CSR Graph
    */
-  void deallocate() { graph.deallocate(); }
+  void deallocate() {
+    galois::gDebug("Deallocating CSR in DistGraph");
+    graph.deallocate();
+  }
 
   /**
    * Sort the underlying LC_CSR_Graph by ID (destinations)
@@ -1182,23 +893,11 @@ public:
         [&](GN n) { graph.sortEdges(n, IdLess<GN, EdgeTy>()); },
         galois::no_stats(), galois::loopname("CSREdgeSort"), galois::steal());
   }
-
-  ////////////////////////////////////////////////////////////////////////////////
-  // what follows are GNN functions; some are not great (e.g. expose arrays)
-  // TODO figure out better way to do this
-  ////////////////////////////////////////////////////////////////////////////////
-  EdgeIndexTy* row_start_ptr() { return graph.row_start_ptr(); }
-  NodeIndexTy* edge_dst_ptr() { return graph.edge_dst_ptr(); }
-
-  //! Used by substrate to determine if some stats are to be reported
-  bool is_a_graph() const { return true; }
 };
 
-template <typename NodeTy, typename EdgeTy, typename NodeIndexTy,
-          typename EdgeIndexTy>
-constexpr const char* const
-    galois::graphs::DistGraph<NodeTy, EdgeTy, NodeIndexTy, EdgeIndexTy>::GRNAME;
+template <typename NodeTy, typename EdgeTy>
+constexpr const char* const galois::graphs::DistGraph<NodeTy, EdgeTy>::GRNAME;
 } // end namespace graphs
 } // end namespace galois
 
-#endif //_GALOIS_DIST_HGRAPH_H
+#endif //_GALOIS_DISTRIBUTED_LOCAL_GRAPH_H
