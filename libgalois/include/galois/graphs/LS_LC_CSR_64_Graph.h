@@ -556,7 +556,6 @@ public:
         galois::steal());
   }
 
-<<<<<<< HEAD
   /**
    * Add edges into the graph
    *
@@ -577,18 +576,6 @@ public:
 
     auto edgeStart = ee;
     auto orig_itr  = edge_begin(src);
-=======
-  template <typename T>
-  void addEdgesUnSort(bool setEdgeVals, GraphNode src, EdgeDst::value_type* dst,
-                      T* dst_data, uint64_t num_dst) {
-    acquireNode(src, galois::MethodFlag::WRITE);
-    auto orig_deg = getDegree(src);
-    auto ee = edgeEnd.fetch_add(num_dst + orig_deg, std::memory_order_relaxed);
-    auto edgeStart = ee;
-    auto orig_itr  = edge_begin(src);
-    auto orig_end  = edge_end(src);
-    auto dst_end   = dst + num_dst;
->>>>>>> ccbe0f155 (add new LS_CSR and LargeVector implementations (#1))
 
     std::memcpy(&edgeDst[edgeStart], &edgeDst[*orig_itr],
                 sizeof(EdgeDst::value_type) * orig_deg);
@@ -606,15 +593,11 @@ public:
 
     edgeIndData[src].first  = edgeStart;
     edgeIndData[src].second = edgeStart + num_dst + orig_deg;
-<<<<<<< HEAD
 
     if (!keep_size) {
       numEdges.fetch_add(num_dst, std::memory_order_relaxed);
     }
     prefixValid = false;
-=======
-    numEdges.fetch_add(num_dst, std::memory_order_relaxed);
->>>>>>> ccbe0f155 (add new LS_CSR and LargeVector implementations (#1))
   }
 
   void addEdgeSort(const uint64_t src, const uint64_t dst) {
