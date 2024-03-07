@@ -296,7 +296,7 @@ if (GALOIS_ENABLE_GPU)
   endif()
 endif()
 
-if (GALOIS_ENABLE_DIST)
+if (GALOIS_ENABLE_DIST AND USE_MKL_BLAS)
   # here because I need the GPU declarations above
   add_subdirectory(libgnn)
 endif()
