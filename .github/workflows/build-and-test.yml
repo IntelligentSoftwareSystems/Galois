@@ -1,0 +1,137 @@
+name: Docker / Ubuntu 22.04 / Build and Test
+run-name: docker-ubuntu-2204 performed by @${{ github.triggering_actor }}
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-create-ubuntu-2204:
+    name: create
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Create Docker Image
+      timeout-minutes: 20
+      run: |
+        make ci-image
+
+  ubuntu-2204-docker:
+    name: gcc / ${{ matrix.build-type }} / ${{ matrix.sanitizer-type }}
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_NAME: galois
+      CONTAINER_SRC_DIR: "/galois"
+      CONTAINER_BUILD_DIR: "/galois/dockerbuild"
+      CONTAINER_WORK_DIR: "/galois"
+      GALOIS_CONTAINER_ENV: "-e=GALOIS_BUILD_TOOL=Ninja"
+      GALOIS_CONTAINER_FLAGS: "--cpus=8"
+      INTERACTIVE: ""
+    defaults:
+      run:
+        shell: bash -l {0}
+    strategy:
+      matrix:
+        build-type: ['Release']
+        sanitizer-type: ['nosan']
+    needs: docker-create-ubuntu-2204
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: 'true'
+        submodules: recursive
+
+    - name: Set up environment variables
+      timeout-minutes: 1
+      run: |
+        echo "UNAME=$(whoami)" >> $GITHUB_ENV
+        echo "UID=$(id -u)" >> $GITHUB_ENV
+        echo "GID=$(id -g)" >> $GITHUB_ENV
+        echo "SRC_DIR=$(pwd)" >> $GITHUB_ENV
+        echo "GALOIS_CCACHE_DIR=/var/local/$(whoami)/.ccache" >> $GITHUB_ENV
+        echo "IMAGE_VERSION=$(git log --pretty="%h" -1 Dockerfile)" >> $GITHUB_ENV
+        cat $GITHUB_ENV
+
+    - name: Configure
+      timeout-minutes: 10
+      run: |
+        mkdir -p ${{ env.GALOIS_CCACHE_DIR }} -m=777
+        CONTAINER_CMD="make setup-ci" \
+          CONTAINER_OPTS="-e=BUILD_TYPE=${{ matrix.build-type }}" \
+          IMAGE_NAME="${{ env.IMAGE_NAME }}" \
+          VERSION="${{ env.IMAGE_VERSION }}" \
+          make docker
+
+    - name: Build
+      timeout-minutes: 15
+      run: |
+        CONTAINER_CMD="bash -c 'ninja -j10 || ninja || ninja'" \
+          IMAGE_NAME="${{ env.IMAGE_NAME }}" \
+          VERSION="${{ env.IMAGE_VERSION }}" \
+          CONTAINER_WORKDIR="${{ env.CONTAINER_BUILD_DIR }}" \
+          make docker
+
+    - name: Run Tests
+      timeout-minutes: 5
+      run: |
+        CONTAINER_CMD="make run-tests" \
+          IMAGE_NAME="${{ env.IMAGE_NAME }}" \
+          VERSION="${{ env.IMAGE_VERSION }}" \
+          make docker
+
+  docker-pre-commit-ubuntu-2204:
+    name: pre-commit
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_NAME: galois
+      CONTAINER_SRC_DIR: "/galois"
+      CONTAINER_BUILD_DIR: "/galois/dockerbuild"
+      CONTAINER_WORK_DIR: "/galois"
+      INTERACTIVE: ""
+    defaults:
+      run:
+        shell: bash -l {0}
+    needs: docker-create-ubuntu-2204
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Set up environment variables
+      timeout-minutes: 1
+      run: |
+        echo "SRC_DIR=$(pwd)" >> $GITHUB_ENV
+        echo "IMAGE_VERSION=$(git log --pretty="%h" -1 Dockerfile)" >> $GITHUB_ENV
+        cat $GITHUB_ENV
+    - name: Check pre-commit
+      timeout-minutes: 10
+      run: |
+        IMAGE_NAME="${{ env.IMAGE_NAME }}" \
+          VERSION="${{ env.IMAGE_VERSION }}" \
+          make docker-pre-commit
