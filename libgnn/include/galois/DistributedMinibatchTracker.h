@@ -16,8 +16,8 @@ public:
       : my_host_id_{my_host_id}, num_hosts_{num_hosts},
         local_minibatch_size_{local_minibatch_size},
         total_minibatch_size_{local_minibatch_size_ * num_hosts_},
-        complete_hosts_{0}, rng_object_{(long unsigned)rand() *
-                                        (my_host_id_ + 1)},
+        complete_hosts_{0},
+        rng_object_{(long unsigned)rand() * (my_host_id_ + 1)},
         int_distribution_{1, 10} {
     max_num_on_hosts_.resize(num_hosts_, 0);
     current_num_on_hosts_.resize(num_hosts_, 0);

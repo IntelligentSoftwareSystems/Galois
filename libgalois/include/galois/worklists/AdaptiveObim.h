@@ -303,9 +303,8 @@ private:
     ThreadData(Index initial)
         : curIndex(initial, 0), scanStart(initial, 0), current(0),
           lastMasterVersion(0), numPops(0), popsLastFix(0),
-          slowPopsLastPeriod(0), pushesLastPeriod(0),
-          popsFromSameQ(0), stats{0, 0, 0, 0},
-          minPrio(std::numeric_limits<Index>::max()),
+          slowPopsLastPeriod(0), pushesLastPeriod(0), popsFromSameQ(0),
+          stats{0, 0, 0, 0}, minPrio(std::numeric_limits<Index>::max()),
           maxPrio(std::numeric_limits<Index>::min()) {}
   };
 

@@ -293,13 +293,13 @@ protected:
 
   template <bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag,
-                   typename std::enable_if<!_A1 && !_A2>::type* = 0) {
+                   typename std::enable_if<!_A1&& !_A2>::type* = 0) {
     galois::runtime::acquire(&nodeData[N], mflag);
   }
 
   template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
   void acquireNode(GraphNode N, MethodFlag mflag,
-                   typename std::enable_if<_A1 && !_A2>::type* = 0) {
+                   typename std::enable_if<_A1&& !_A2>::type* = 0) {
     this->outOfLineAcquire(getId(N), mflag);
   }
 
@@ -338,7 +338,7 @@ protected:
   template <bool _A1 = EdgeData::has_value,
             bool _A2 = LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph&, typename FileGraph::edge_iterator nn,
-                          typename std::enable_if<_A1 && !_A2>::type* = 0) {
+                          typename std::enable_if<_A1&& !_A2>::type* = 0) {
     edgeData.set(*nn, {});
   }
 

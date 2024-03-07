@@ -939,7 +939,7 @@ public:
     this->Construct1HopFeatureCPU();
     // this->PrintFeatures("1hop");
     this->Construct2HopFeatureCPU();
-    //this->PrintFeatures("2hop");
+    // this->PrintFeatures("2hop");
   }
 
   void PrintFeatures(std::string postfix) {
@@ -1632,7 +1632,8 @@ public:
     return definitely_sampled_nodes_;
   }
 
-  /* @brief Return true if this is constructed from a WMD graph otherwise false. */
+  /* @brief Return true if this is constructed from a WMD graph otherwise false.
+   */
   bool is_using_wmd() { return this->use_wmd_; }
 
 private:
@@ -2401,10 +2402,10 @@ private:
     std::cout << "single accuracy print:\n";
     for (int i = *begin_owned(); i < *end_owned(); ++i) {
       if (!IsValidForPhase(i, GNNPhase::kBatch)) {
-        continue; 
+        continue;
       }
       //std::cout << subgraph_->SIDToLID(i) << ", " << galois::MaxIndex(num_label_classes_, &predictions[i * num_label_classes_]) <<
-      std::cout << "accuracy:" << subgraph_->SIDToLID(i) << ", " << 
+      std::cout << "accuracy:" << subgraph_->SIDToLID(i) << ", " <<
       predictions[i * num_label_classes_] << ", " <<
       predictions[i * num_label_classes_ + 1] << ", " <<
       predictions[i * num_label_classes_ + 2] << ", " <<

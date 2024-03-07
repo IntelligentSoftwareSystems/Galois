@@ -159,7 +159,7 @@ private:
   void OptimizeLayer(BaseOptimizer*, size_t) { return; };
 
 #ifdef GALOIS_ENABLE_GPU
-    // TODO(loc/hochan)
+  // TODO(loc/hochan)
 #endif
 };
 

@@ -57,11 +57,10 @@ galois::runtime::LockManagerBase::tryAcquire(
     lockable->owner.setValue(this);
     return NEW_OWNER;
 #endif
-}
-else if (getOwner(lockable) == this) {
-  return ALREADY_OWNER;
-}
-return FAIL;
+  } else if (getOwner(lockable) == this) {
+    return ALREADY_OWNER;
+  }
+  return FAIL;
 }
 
 void galois::runtime::SimpleRuntimeContext::release(

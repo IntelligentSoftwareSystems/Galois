@@ -42,8 +42,9 @@ protected:
   uint64_t _numEdges; //!< number of edges in graph
   //! maps from host id to nodes that host as read from disk
   std::vector<std::pair<uint64_t, uint64_t>> _gid2host;
-  std::vector<uint32_t> _virtualToPhyMapping; //saving Virtual hosts to Phy hosts map
-  bool hash; //switch between using gid2host and VtoP maps
+  std::vector<uint32_t>
+      _virtualToPhyMapping; // saving Virtual hosts to Phy hosts map
+  bool hash;                // switch between using gid2host and VtoP maps
 
 public:
   /**
@@ -66,11 +67,11 @@ public:
    */
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
     _gid2host = gid2host;
-    hash = false;
+    hash      = false;
   }
   void saveGIDToHost(std::vector<uint32_t>& virtualToPhyMapping) {
     _virtualToPhyMapping = virtualToPhyMapping;
-    hash = true;
+    hash                 = true;
   }
 
   bool predeterminedMapping(std::vector<uint32_t>&) { return false; }
@@ -97,7 +98,7 @@ public:
    * @returns Host ID of host that read the node specified by the GID.
    */
   uint32_t retrieveMaster(uint32_t gid) const {
-    if(hash == false) {
+    if (hash == false) {
       for (auto h = 0U; h < _numHosts; ++h) {
         uint64_t start, end;
         std::tie(start, end) = _gid2host[h];
@@ -108,7 +109,7 @@ public:
       assert(false);
       return _numHosts;
     } else {
-      return _virtualToPhyMapping[gid%(_virtualToPhyMapping.size())];
+      return _virtualToPhyMapping[gid % (_virtualToPhyMapping.size())];
     }
   }
 

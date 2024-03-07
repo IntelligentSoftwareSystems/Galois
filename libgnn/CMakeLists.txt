@@ -9,9 +9,9 @@ set(sources
 add_library(galois_gnn STATIC ${sources})
 
 target_compile_options(galois_gnn PUBLIC
-		$<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+    $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
 target_include_directories(galois_gnn PUBLIC
-		$<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
+    $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
 target_link_libraries(galois_gnn PUBLIC $<LINK_ONLY:MKL::MKL>)
 target_link_libraries(galois_gnn PUBLIC galois_shmem)
 target_link_libraries(galois_gnn PUBLIC galois_dist_async galois_cusp galois_gluon galois_support)
@@ -21,9 +21,9 @@ target_include_directories(galois_gnn PUBLIC
 
 add_library(galois_gnn_single STATIC ${sources})
 target_compile_options(galois_gnn_single PUBLIC
-		$<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+    $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
 target_include_directories(galois_gnn_single PUBLIC
-		$<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
+    $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
 target_link_libraries(galois_gnn_single PUBLIC $<LINK_ONLY:MKL::MKL>)
 target_link_libraries(galois_gnn_single PUBLIC galois_shmem)
 target_link_libraries(galois_gnn_single PUBLIC galois_dist_async galois_cusp galois_gluon galois_support)
