@@ -39,3 +39,8 @@ docker:
 
 run-cmake:
 	@cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUSE_MKL_BLAS=ON -DGALOIS_ENABLE_DIST=ON
+
+run-tests:
+	@ctest --test-dir dockerbuild -R wmd --verbose
+	@ctest --test-dir dockerbuild -R large-vec --verbose
+	@ctest --test-dir dockerbuild -R compile-lscsr --verbose
