@@ -1,0 +1,148 @@
+name: Docker / Ubuntu 22.04 / Build and Test
+run-name: docker-ubuntu-2204 performed by @${{ github.triggering_actor }}
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+  push:
+    branches:
+      - master
+      - main
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-create-ubuntu-2204:
+    name: create
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Create Docker Image
+      timeout-minutes: 45
+      run: |
+        make ci-image
+
+  ubuntu-2204-docker:
+    name: gcc / ${{ matrix.build-type }} / ${{ matrix.sanitizer-type }}
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_NAME: galois
+      CONTAINER_SRC_DIR: "/pando-galois"
+      CONTAINER_BUILD_DIR: "/pando-galois/build"
+      CONTAINER_WORK_DIR: "/pando-galois"
+      GALOIS_CONTAINER_ENV: "-e=GALOIS_BUILD_TOOL=Ninja"
+      GALOIS_CONTAINER_FLAGS: "--cpus=8"
+      INTERACTIVE: ""
+    defaults:
+      run:
+        shell: bash -l {0}
+    strategy:
+      matrix:
+        build-type: ['Release', 'Debug']
+        sanitizer-type: ['nosan', 'san']
+        exclude:
+          - build-type: 'Debug'
+            sanitizer-type: 'san'
+    needs: docker-create-ubuntu-2204
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: 'true'
+        submodules: recursive
+
+    - name: Set up environment variables
+      timeout-minutes: 1
+      run: |
+        echo "UNAME=$(whoami)" >> $GITHUB_ENV
+        echo "UID=$(id -u)" >> $GITHUB_ENV
+        echo "GID=$(id -g)" >> $GITHUB_ENV
+        echo "SRC_DIR=$(pwd)" >> $GITHUB_ENV
+        echo "GALOIS_CCACHE_DIR=/var/local/$(whoami)/.ccache" >> $GITHUB_ENV
+        echo "IMAGE_VERSION=$(git log --pretty="%h" -1 Dockerfile)" >> $GITHUB_ENV
+        if [ ${{ matrix.sanitizer-type }} == 'san' ]; then
+          echo "GALOIS_CONTAINER_ENV=$GALOIS_CONTAINER_ENV -e=GALOIS_EXTRA_CXX_FLAGS='\"-fsanitize=address -fsanitize=undefined\"'" >> $GITHUB_ENV
+        fi
+        if [ ${{ matrix.build-type }} == 'Debug' ]; then
+          echo "GALOIS_CONTAINER_ENV=$GALOIS_CONTAINER_ENV -e=GALOIS_EXTRA_CXX_FLAGS='-O3'" >> $GITHUB_ENV
+        fi
+        cat $GITHUB_ENV
+
+    - name: Configure
+      timeout-minutes: 10
+      run: |
+        mkdir -p ${{ env.GALOIS_CCACHE_DIR }} -m=777
+        CONTAINER_CMD="bash -lc 'source /opt/intel/oneapi/setvars.sh && make setup-ci'" \
+          CONTAINER_OPTS="-e=BUILD_TYPE=${{ matrix.build-type }}" \
+          IMAGE_NAME="${{ env.IMAGE_NAME }}" \
+          VERSION="${{ env.IMAGE_VERSION }}" \
+          make docker
+
+    - name: Build
+      timeout-minutes: 15
+      run: |
+        CONTAINER_CMD="bash -c 'ninja -j10 || ninja || ninja'" \
+          IMAGE_NAME="${{ env.IMAGE_NAME }}" \
+          VERSION="${{ env.IMAGE_VERSION }}" \
+          CONTAINER_WORKDIR="${{ env.CONTAINER_BUILD_DIR }}" \
+          make docker
+
+    - name: Run Tests
+      timeout-minutes: 5
+      run: |
+        CONTAINER_CMD="make run-tests" \
+          IMAGE_NAME="${{ env.IMAGE_NAME }}" \
+          VERSION="${{ env.IMAGE_VERSION }}" \
+          make docker
+
+  docker-pre-commit-ubuntu-2204:
+    name: pre-commit
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_NAME: galois
+      CONTAINER_SRC_DIR: "/pando-galois"
+      CONTAINER_BUILD_DIR: "/pando-galois/build"
+      CONTAINER_WORK_DIR: "/pando-galois"
+      INTERACTIVE: ""
+    defaults:
+      run:
+        shell: bash -l {0}
+    needs: docker-create-ubuntu-2204
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Set up environment variables
+      timeout-minutes: 1
+      run: |
+        echo "SRC_DIR=$(pwd)" >> $GITHUB_ENV
+        echo "IMAGE_VERSION=$(git log --pretty="%h" -1 Dockerfile)" >> $GITHUB_ENV
+        cat $GITHUB_ENV
+    - name: Check pre-commit
+      timeout-minutes: 10
+      run: |
+        IMAGE_NAME="${{ env.IMAGE_NAME }}" \
+          VERSION="${{ env.IMAGE_VERSION }}" \
+          make docker-pre-commit

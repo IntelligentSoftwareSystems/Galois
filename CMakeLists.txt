@@ -73,6 +73,29 @@ include(CTest)
 
 ###### Configure compiler ######
 
+if(PROJECT_IS_TOP_LEVEL)
+  if(CMAKE_CXX_FLAGS)
+    message(STATUS "Provided CXX Flags: " ${CMAKE_CXX_FLAGS})
+  endif()
+
+  set(CMAKE_OPTIMIZE_DEPENDENCIES true)
+
+  # Setup CCache
+  find_program(CCACHE_EXECUTABLE ccache)
+  if(CCACHE_EXECUTABLE)
+    message(STATUS "CCache found at: " ${CCACHE_EXECUTABLE})
+    set(ccacheEnv
+      CCACHE_SLOPPINESS=pch_defines,time_macros
+    )
+    # NOTE: Ccache 4.2+ required for reliable CUDA support
+    foreach(lang IN ITEMS C CXX OBJC OBJCXX CUDA)
+      set(CMAKE_${lang}_COMPILER_LAUNCHER
+        ${CMAKE_COMMAND} -E env ${ccacheEnv} ${CCACHE_EXECUTABLE}
+      )
+    endforeach()
+  endif()
+endif()
+
 # generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

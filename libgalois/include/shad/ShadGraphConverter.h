@@ -523,7 +523,7 @@ private:
     return tokens;
   }
 
-  void CountNumEdgesForEachVertex(uint64_t numNodes, uint64_t /*numEdges*/) {
+  void CountNumEdgesForEachVertex(uint64_t numNodes, uint64_t numEdges) {
     // galois::on_each([this, numNodes, numEdges](
     galois::on_each([&](uint32_t tid, uint32_t numThreads) {
       // Each thread is assigned disjointed range of nodes.
@@ -543,6 +543,8 @@ private:
 
 #ifndef NDEBUG
     this->VerifyNumEdgesPerVertex(numEdges);
+#else
+    (void)numEdges;
 #endif
   }
 
