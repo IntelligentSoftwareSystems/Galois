@@ -251,7 +251,8 @@ public:
   }
 
 private:
-  struct VertexMetadata : public SpinLock {
+  struct VertexMetadata {
+    std::atomic_uint8_t spinlock = ATOMIC_VAR_INIT(0);
     uint8_t buffer : 1;
     uint64_t begin : 48; // inclusive
     uint64_t end : 48;   // exclusive
@@ -266,6 +267,13 @@ private:
     VertexMetadata(VertexMetadata&& other)
         : buffer(std::move(other.buffer)), begin(std::move(other.begin)),
           end(std::move(other.end)), degree(std::move(other.degree)) {}
+
+    inline void lock() {
+      while (spinlock.exchange(1, std::memory_order_acquire))
+        ;
+    }
+
+    inline void unlock() { spinlock.store(0, std::memory_order_release); }
   };
 
   struct EdgeMetadata {
