@@ -30,8 +30,7 @@
 #include <unordered_map>
 #include <fstream>
 
-#include "galois/graphs/LC_CSR_Graph.h"
-#include "galois/graphs/LC_CSR_CSC_Graph.h"
+#include "galois/graphs/LS_LC_CSR_64_Graph.h"
 #include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/graphs/OfflineGraph.h"
@@ -68,9 +67,10 @@ private:
   //! Graph name used for printing things
   constexpr static const char* const GRNAME = "dGraph";
 
-  using GraphTy =
-      galois::graphs::LC_CSR_CSC_Graph<NodeTy, EdgeTy, false, true, false,
-                                       false, EdgeTy, NodeIndexTy, EdgeIndexTy>;
+  //using GraphTy =
+  //    galois::graphs::LS_LC_CSR_64_Graph<NodeTy, EdgeTy, false, true, false,
+  //                                     false, EdgeTy, NodeIndexTy, EdgeIndexTy>;
+  using GraphTy = galois::graphs::LS_LC_CSR_64_Graph<NodeTy, EdgeTy, true>;
 
   // vector for determining range objects for master nodes + nodes
   // with edges (which includes masters)
@@ -913,20 +913,6 @@ public:
    *
    * @returns number of nodes present in this (local) graph
    */
-  inline size_t size() const { return graph.size(); }
-
-  /**
-   * Gets number of edges on this (local) graph.
-   *
-   * @returns number of edges present in this (local) graph
-   */
-  inline size_t sizeEdges() const { return graph.sizeEdges(); }
-
-  /**
-   * Gets number of nodes on this (local) graph.
-   *
-   * @returns number of nodes present in this (local) graph
-   */
   inline size_t numMasters() const { return numOwned; }
 
   /**
@@ -1192,6 +1178,85 @@ public:
 
   //! Used by substrate to determine if some stats are to be reported
   bool is_a_graph() const { return true; }
+
+/** size stuff **/
+  inline size_t size() { return graph.size(); }
+
+  inline size_t size() const noexcept { return graph.size(); }
+
+  inline size_t sizeEdges() { return graph.sizeEdges(); }
+
+  inline size_t sizeEdges() const noexcept { return graph.sizeEdges(); }
+
+  std::uint64_t getNumEdges(typename GraphTy::node_data_reference vertex) {
+    return graph.getDegree(getTokenID(vertex));
+  }
+
+  inline typename GraphTy::node_data_reference
+   getTopologyID(uint64_t nodeID) {
+    return graph.getData(getLID(nodeID));
+  }
+
+  inline typename GraphTy::node_data_reference
+   getTopologyIDFromIndex(uint64_t index) {
+    return graph.getData(index);
+  }
+
+  uint64_t getTokenID(typename GraphTy::node_data_reference vertex) {
+    return getGID(&vertex - &graph.getData(0));
+  }
+
+  uint32_t getVertexIndex(typename GraphTy::node_data_reference vertex) {
+    return (&vertex - &graph.getData(0));
+  }
+
+  uint64_t getLocalityVertex(typename GraphTy::node_data_reference vertex) {
+    uint64_t gid = getTopologyID(vertex);
+    return getHostIDImpl(gid);
+  }
+
+  /** Edge Manipulation **/
+  edge_iterator mintEdgeHandle(typename GraphTy::node_data_reference src, std::uint64_t off) {
+    return edge_begin(src) + off;
+  }
+
+  /** Data Manipulations **/
+  //void setData(typename GraphTy::node_data_reference vertex, NodeTy data) {
+  //  graph.setData(vertex, data);
+  //}
+
+  //NodeTy getData(typename GraphTy::node_data_reference vertex) {
+  //  return graph.getData(getTokenID(vertex));
+  //}
+
+  //void setEdgeData(edge_iterator eh, EdgeTy data) {
+  //  graph.setEdgeData(eh, data);
+  //}
+
+  //EdgeTy getEdgeData(edge_iterator eh) {
+  //  return graph.getEdgeData(eh);
+  //}
+
+  /** Topology Modifications **/
+  typename GraphTy::node_data_reference addVertexTopologyOnly(uint32_t token) {
+    //atomically add to G2L and L2G maps
+    return graph.addVertexTopologyOnly(token);
+  }
+
+  //typename GraphTy::node_data_reference addVertex(uint32_t token, NodeTy data) {
+  //  //atomically add to G2L and L2G maps
+  //  return graph.addVertex(token, data);
+  //}
+  bool addEdgesTopologyOnly(typename GraphTy::node_data_reference src, std::vector<uint32_t> dsts) {
+    return graph.addEdgesTopologyOnly(src, dsts); 
+  }
+  bool addEdges(typename GraphTy::node_data_reference src, std::vector<uint32_t> dsts,
+                         std::vector<EdgeTy> data) {
+    return graph.addEdges(src, dsts, data);
+  }
+  bool deleteEdges(typename GraphTy::node_data_reference src, std::vector<edge_iterator> edges) {
+    return graph.deleteEdges(src, edges);
+  }
 };
 
 template <typename NodeTy, typename EdgeTy, typename NodeIndexTy,
