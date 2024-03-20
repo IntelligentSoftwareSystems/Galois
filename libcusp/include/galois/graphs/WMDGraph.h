@@ -362,7 +362,7 @@ public:
       std::vector<std::unique_ptr<
           galois::graphs::FileParser<EdgeDataType>>>& parsers,
       galois::graphs::MASTERS_DISTRIBUTION md,
-      uint32_t scaleFactor = 4)
+      uint32_t scaleFactor = 1)
       : OfflineGraph() {
     auto& net         = galois::runtime::getSystemNetworkInterface();
     hostID            = net.ID;
@@ -372,15 +372,13 @@ public:
     virtualToPhyMapping.resize(numVirtualHosts);
 
     galois::gDebug("[", hostID, "] loadGraphFile!");
+    //TODO: add support for MASTERS_DISTRIBUTION
     if(md)
       std::cout << "Masters distribution policy is not supported for WMDGraph" << std::endl;
     loadGraphFiles(parsers);
-    std::cout << "Graph loaded" << std::endl;
     mergeThreadDS();
-    std::cout << "Thread DS merged" << std::endl;
     galois::gDebug("[", hostID, "] Build Virtual To Physical Host Map");
     buildVtoPHostMap();
-    std::cout << "VtoP Map built" << std::endl;
   }
 
   /**
