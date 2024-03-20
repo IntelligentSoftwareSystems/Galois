@@ -1220,22 +1220,37 @@ public:
     return edge_begin(src) + off;
   }
 
+  template<typename T = NodeTy>
+  typename std::enable_if<!std::is_void<T>::value>::type
+  setData(typename GraphTy::node_data_reference vertex, T data) {
+      graph.setData(vertex, data);
+  }
+  // Function that sets data, enabled only if Y is void
+  //template<typename T = NodeTy>
+  //typename std::enable_if<std::is_void<T>::value>::type
+  //setData(typename GraphTy::node_data_reference vertex) {
+  //    // Handle case where Y is void
+  //}
+
   /** Data Manipulations **/
-  //void setData(typename GraphTy::node_data_reference vertex, NodeTy data) {
-  //  graph.setData(vertex, data);
-  //}
 
-  //NodeTy getData(typename GraphTy::node_data_reference vertex) {
-  //  return graph.getData(getTokenID(vertex));
-  //}
+  //template<typename T = NodeTy>
+  //typename std::enable_if<!std::is_void<T>::value>::type
+  typename GraphTy::node_data_reference getData(typename GraphTy::node_data_reference vertex) {
+    return graph.getData(getTokenID(vertex));
+  }
 
-  //void setEdgeData(edge_iterator eh, EdgeTy data) {
-  //  graph.setEdgeData(eh, data);
-  //}
+  template<typename T = NodeTy>
+  typename std::enable_if<!std::is_void<T>::value>::type
+   setEdgeData(edge_iterator eh, T data) {
+    graph.setEdgeData(eh, data);
+  }
 
-  //EdgeTy getEdgeData(edge_iterator eh) {
-  //  return graph.getEdgeData(eh);
-  //}
+  template<typename T = NodeTy>
+  typename std::enable_if<!std::is_void<T>::value, typename GraphTy::edge_data_reference>::type
+   getEdgeData(edge_iterator eh) {
+    return graph.getEdgeData(eh);
+  }
 
   /** Topology Modifications **/
   typename GraphTy::node_data_reference addVertexTopologyOnly(uint32_t token) {
@@ -1243,10 +1258,13 @@ public:
     return graph.addVertexTopologyOnly(token);
   }
 
-  //typename GraphTy::node_data_reference addVertex(uint32_t token, NodeTy data) {
-  //  //atomically add to G2L and L2G maps
-  //  return graph.addVertex(token, data);
-  //}
+  template<typename T = NodeTy>
+  typename std::enable_if<!std::is_void<T>::value>::type
+   addVertex(uint32_t token, T data) {
+    //atomically add to G2L and L2G maps
+    return graph.addVertex(token, data);
+  }
+
   bool addEdgesTopologyOnly(typename GraphTy::node_data_reference src, std::vector<uint32_t> dsts) {
     return graph.addEdgesTopologyOnly(src, dsts); 
   }
