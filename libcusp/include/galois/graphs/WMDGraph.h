@@ -53,7 +53,6 @@ void inline increment_evilPhase() {
 template <typename NodeDataType, typename EdgeDataType>
 class EdgeListOfflineGraph : public OfflineGraph {
 protected:
-  // TODO: consider typedef uint64_t NodeIDType ?
   typedef boost::counting_iterator<uint64_t> iterator;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
 
@@ -95,7 +94,6 @@ protected:
 
   /**
    * Load graph info from the file.
-   * Expect a WMD format csv
    *
    * @param filename loaded file for the graph
    *
@@ -333,7 +331,6 @@ protected:
     }
     perThreadLocalEdges.clear();
     perThreadLocalEdges.shrink_to_fit();
-
   }
 
 public:
@@ -392,29 +389,6 @@ public:
   iterator begin() { return iterator(0); }
 
   iterator end() { return iterator(size()); }
-
-  ///**
-  // * return the end idx of edges of node N
-  // *
-  // * @param N global ID of node
-  // * @return edge_iterator
-  // */
-  //edge_iterator edge_begin(uint64_t N) {
-  //  if (N == 0)
-  //    return edge_iterator(0);
-  //  else
-  //    return edge_iterator(globalEdgePrefixSum[N - 1]);
-  //}
-
-  ///**
-  // * return the begin idx of edges of node N
-  // *
-  // * @param N global ID of node
-  // * @return edge_iterator
-  // */
-  //edge_iterator edge_end(uint64_t N) {
-  //  return edge_iterator(globalEdgePrefixSum[N]);
-  //}
 
   /**
    * Returns 2 ranges (one for nodes, one for edges) for a particular
@@ -476,6 +450,69 @@ private:
   std::vector<EdgeDataType> edges;
 
 
+  void buildLocalEdges(std::vector<std::vector<EdgeDataType>> edgeList, std::unordered_map<uint64_t, uint32_t>& GIDtoLID, std::vector<std::vector<EdgeDataType>>& localEdges) {
+
+      uint32_t activeThreads  = galois::getActiveThreads();
+      std::vector<std::vector<uint64_t>> threadLIDMap(activeThreads);
+    //Step1: Insert src id of edges to threadLIDtoGID Vector
+      galois::on_each([&](unsigned tid, unsigned nthreads) {
+        size_t beginNode;
+        size_t endNode;
+        std::tie(beginNode, endNode) =
+            galois::block_range((size_t)0, edgeList.size(), tid, nthreads);
+        for (size_t j = beginNode; j < endNode; j++) {
+          if(GIDtoLID.find(edgeList[j][0].src) == GIDtoLID.end()) {
+            threadLIDMap[tid].push_back(edgeList[j][0].src);
+          }
+        }
+      });
+
+      //Step2: Create Prefix Sum of threadLIDtoGID Vector
+      std::vector<uint64_t> threadLIDtoGIDPrefixSum;
+      threadLIDtoGIDPrefixSum.resize(activeThreads, 0);
+      for (uint32_t i = 1; i < activeThreads; i++) {
+        threadLIDtoGIDPrefixSum[i] =
+            threadLIDtoGIDPrefixSum[i - 1] + threadLIDMap[i - 1].size();
+      }
+      for (uint32_t i = 0; i < activeThreads; i++) {
+        LIDtoGID.insert(LIDtoGID.end(), threadLIDMap[i].begin(), threadLIDMap[i].end());
+      }
+
+      //Step3: Insert src id of edges to GIDtoLID Vector
+      uint64_t offset = GIDtoLID.size();
+      std::vector<std::map<uint64_t, uint32_t>> threadMap(activeThreads);
+      galois::do_all(
+        galois::iterate((uint32_t)0, activeThreads),
+        [&](size_t n) {
+        for (size_t j = 0; j < threadLIDMap[n].size(); j++) {
+            threadMap[n][threadLIDMap[n][j]] = offset +
+                threadLIDtoGIDPrefixSum[n] + j;
+        }
+        
+      });
+      for (uint32_t t = 0; t < activeThreads; t++) {
+        GIDtoLID.insert(threadMap[t].begin(), threadMap[t].end());
+      }
+      threadLIDMap.clear();
+      threadLIDtoGIDPrefixSum.clear();
+
+      //Step4: Insert dst id of edges to GIDtoLID Vector
+      localEdges.resize(GIDtoLID.size());
+      galois::on_each([&](unsigned tid, unsigned nthreads) {
+        size_t beginNode;
+        size_t endNode;
+        std::tie(beginNode, endNode) =
+            galois::block_range((size_t)0, edgeList.size(), tid, nthreads);
+        for (size_t j = beginNode; j < endNode; j++) {
+          auto lid = GIDtoLID[edgeList[j][0].src];
+          localEdges[lid].insert(
+              std::end(localEdges[lid]),
+              std::begin(edgeList[j]), std::end(edgeList[j]));
+        }
+      });
+      edgeList.clear();
+  }
+
   /**
    * Exchanges vertex ids to form a global id to local id map before exchanging
    * edges so that using the map edges can be inserted into the edgelist
@@ -488,19 +525,14 @@ private:
     // prepare both nodedata and edgedata to send to all hosts
     std::vector<std::vector<std::vector<EdgeDataType>>> edgesToSend(
         numHosts, std::vector<std::vector<EdgeDataType>>());
-    std::vector<std::vector<uint64_t>> nodesToSend(
-        numHosts, std::vector<uint64_t>());
 
     // PerThread DS
     std::vector<std::vector<std::vector<std::vector<EdgeDataType>>>>
         threadEdgesToSend(
             activeThreads,
             std::vector<std::vector<std::vector<EdgeDataType>>>());
-    std::vector<std::vector<std::vector<uint64_t>>> threadNodesToSend(
-        activeThreads, std::vector<std::vector<uint64_t>>());
     for (uint32_t i = 0; i < activeThreads; i++) {
       threadEdgesToSend[i].resize(numHosts);
-      threadNodesToSend[i].resize(numHosts);
     }
 
     // Prepare edgeList and Vertex ID list to send to other hosts
@@ -517,111 +549,16 @@ private:
       }
     });
 
-    // Prepare Nodedata to send to other hosts
-    galois::on_each([&](unsigned tid, unsigned nthreads) {
-      size_t beginNode;
-      size_t endNode;
-      std::tie(beginNode, endNode) =
-          galois::block_range((uint64_t)0, localEdges.size(), tid, nthreads);
-      for (size_t i = beginNode; i < (endNode); ++i) {
-        int host =
-            virtualToPhyMapping[(localEdges[i][0].src) % (scaleFactor * numHosts)];
-        threadNodesToSend[tid][host].push_back((localEdges[i][0].src));
-      }
-    });
     for (uint32_t tid = 0; tid < activeThreads; tid++) {
       for (uint32_t h = 0; h < numHosts; h++) {
-        nodesToSend[h].insert(nodesToSend[h].end(),
-                              threadNodesToSend[tid][h].begin(),
-                              threadNodesToSend[tid][h].end());
         edgesToSend[h].insert(edgesToSend[h].end(),
                               threadEdgesToSend[tid][h].begin(),
                               threadEdgesToSend[tid][h].end());
       }
     }
-    threadNodesToSend.clear();
     threadEdgesToSend.clear();
     localEdges.clear();
-    // Send Nodelist
-    for (uint32_t h = 0; h < numHosts; h++) {
-      if (h == hostID)
-        continue;
-      galois::runtime::SendBuffer sendBuffer;
-      galois::runtime::gSerialize(sendBuffer, nodesToSend[h]);
-      net.sendTagged(h, galois::runtime::evilPhase, std::move(sendBuffer));
-    }
-    // Collect node data received from other hosts
-    for (uint32_t i = 0; i < (numHosts - 1); i++) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase);
-      } while (!p);
-      std::vector<uint64_t> NodeData;
-      galois::runtime::gDeserialize(p->second, NodeData);
-      std::vector<std::map<uint64_t, uint32_t>> threadMap(activeThreads);
-      std::vector<std::map<uint32_t, uint64_t>> threadLIDMap(activeThreads);
-      uint64_t offset = GIDtoLID.size();
-      galois::on_each([&](unsigned tid, unsigned nthreads) {
-        size_t beginNode;
-        size_t endNode;
-        std::tie(beginNode, endNode) =
-            galois::block_range((uint64_t)0, NodeData.size(), tid, nthreads);
-        uint64_t delta;
-        delta = std::ceil((double)NodeData.size() / activeThreads);
-        uint64_t cnt = 0;
-        for (size_t j = beginNode; j < (endNode); ++j) {
-          if(GIDtoLID.find(NodeData[j]) != GIDtoLID.end())
-            continue;
-          threadMap[tid][NodeData[j]] =
-              offset + (tid * (delta)) + cnt - beginNode;
-          threadLIDMap[tid][offset + (tid * (delta)) + cnt - beginNode] = 
-              NodeData[j];
-          cnt++;
-        }
-      });
-      for (uint32_t t = 0; t < activeThreads; t++) {
-        GIDtoLID.insert(threadMap[t].begin(), threadMap[t].end());
-        LIDtoGID.insert(threadLIDMap[t].begin(), threadLIDMap[t].end());
-      }
-      threadMap.clear();
-      NodeData.clear();
-      threadLIDMap.clear();
-    }
 
-    // Collect node data present in this host
-    std::vector<std::map<uint64_t, size_t>> threadMap(activeThreads);
-    std::vector<std::map<size_t, uint64_t>> threadLIDMap(activeThreads);
-    uint64_t offset = GIDtoLID.size();
-    galois::on_each([&](unsigned tid, unsigned nthreads) {
-      size_t beginNode;
-      size_t endNode;
-      std::tie(beginNode, endNode) = galois::block_range(
-          (uint64_t)0, nodesToSend[hostID].size(), tid, nthreads);
-      uint64_t delta;
-      delta = std::ceil((double)nodesToSend[hostID].size() / activeThreads);
-      uint64_t cnt = 0;
-      for (size_t i = beginNode; i < (endNode); ++i) {
-          if(GIDtoLID.find(nodesToSend[hostID][i]) != GIDtoLID.end())
-            continue;
-        threadMap[tid][nodesToSend[hostID][i]] =
-            offset + (tid * (delta)) + cnt - beginNode;
-        threadLIDMap[tid][offset + (tid * (delta)) + cnt - beginNode] = 
-            nodesToSend[hostID][i];
-        cnt++;
-      }
-    });
-    for (uint32_t t = 0; t < activeThreads; t++) {
-      GIDtoLID.insert(threadMap[t].begin(), threadMap[t].end());
-      LIDtoGID.insert(threadLIDMap[t].begin(), threadLIDMap[t].end());
-    }
-    threadMap.clear();
-    threadLIDMap.clear();
-    numLocalNodes = GIDtoLID.size();
-    localEdges.clear();
-    nodesToSend.clear();
-
-
-    increment_evilPhase();
     // Send Edgelist
     for (uint32_t h = 0; h < numHosts; h++) {
       if (h == hostID)
@@ -646,37 +583,17 @@ private:
       galois::runtime::gDeserialize(p->second, edgeList);
       galois::gInfo("[", hostID, "] recv from ", sendingHost,
                     " edgeList size: ", edgeList.size());
-      galois::on_each([&](unsigned tid, unsigned nthreads) {
-        size_t beginNode;
-        size_t endNode;
-        std::tie(beginNode, endNode) =
-            galois::block_range((size_t)0, edgeList.size(), tid, nthreads);
-        for (size_t j = beginNode; j < endNode; j++) {
-          assert(GIDtoLID.find(edgeList[j][0].src) != GIDtoLID.end());
-          auto lid = GIDtoLID[edgeList[j][0].src];
-          localEdges[lid].insert(
-              std::end(localEdges[lid]),
-              std::begin(edgeList[j]), std::end(edgeList[j]));
-        }
-      });
-      edgeList.clear();
+
+      buildLocalEdges(edgeList, GIDtoLID, localEdges);
     }
-    galois::on_each([&](unsigned tid, unsigned nthreads) {
-      size_t beginNode;
-      size_t endNode;
-      std::tie(beginNode, endNode) = galois::block_range(
-          (size_t)0, edgesToSend[hostID].size(), tid, nthreads);
-      for (size_t j = beginNode; j < endNode; j++) {
-        auto lid = GIDtoLID[edgesToSend[hostID][j][0].src];
-        localEdges[lid].insert(
-            std::end(localEdges[lid]),
-            std::begin(edgesToSend[hostID][j]),
-            std::end(edgesToSend[hostID][j]));
-      }
-    });
+
+
+    //Insert edges from self
+    buildLocalEdges(edgesToSend[hostID], GIDtoLID, localEdges);
     increment_evilPhase();
     edgesToSend.clear();
     localNodeSize[hostID] = localEdges.size();
+    numLocalNodes = localEdges.size();
   }
 
   void exchangeNodeData(EdgeListOfflineGraph<galois::Vertex, galois::Edge>& srcGraph) {
@@ -687,7 +604,6 @@ private:
       if (h == hostID) {
         continue;
       }
-      // serialize size_t
       galois::runtime::SendBuffer sendBuffer;
       galois::runtime::gSerialize(sendBuffer, localNodeSize);
       net.sendTagged(h, galois::runtime::evilPhase, std::move(sendBuffer));
@@ -699,7 +615,6 @@ private:
         p = net.recieveTagged(galois::runtime::evilPhase);
       } while (!p);
       std::vector<uint64_t> cnt;
-      // deserialize local_node_size
       galois::runtime::gDeserialize(p->second, cnt);
       assert(cnt.size() == numHosts);
       for (uint32_t i = 0; i < numHosts; i++) {
@@ -749,7 +664,7 @@ private:
 public:
   EdgeListBufferedGraph() : BufferedGraph<EdgeDataType>() {}
   std::unordered_map<uint64_t, uint32_t> GIDtoLID;
-  std::unordered_map<uint32_t, uint64_t> LIDtoGID;
+  std::vector<uint64_t> LIDtoGID;
 
   // copy not allowed
   //! disabled copy constructor
