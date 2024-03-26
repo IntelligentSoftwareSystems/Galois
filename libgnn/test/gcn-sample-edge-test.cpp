@@ -29,7 +29,6 @@
 int main() {
   galois::DistMemSys G;
 
-  size_t num_threads = 1;
   // tester graph: 0 - 1 - 2 - 3 - 4 - 5 - 6
   galois::graphs::GNNGraph<char, void> test_graph(
       "tester", galois::graphs::GNNPartitionScheme::kOEC, true, false);
@@ -121,9 +120,9 @@ int main() {
   GALOIS_LOG_ASSERT(layer_1_backward_output[3] == 2);
   GALOIS_LOG_ASSERT(layer_1_backward_output[4] == 2);
   GALOIS_LOG_ASSERT(layer_1_backward_output[5] == 2);
-  GALOIS_LOG_ASSERT(layer_1_backward_output[6] == 0);
-  GALOIS_LOG_ASSERT(layer_1_backward_output[7] == 0);
-  GALOIS_LOG_ASSERT(layer_1_backward_output[8] == 0);
+  GALOIS_LOG_ASSERT(layer_1_backward_output[6] == 2);
+  GALOIS_LOG_ASSERT(layer_1_backward_output[7] == 2);
+  GALOIS_LOG_ASSERT(layer_1_backward_output[8] == 2);
   GALOIS_LOG_ASSERT(layer_1_backward_output[9] == 0);
   GALOIS_LOG_ASSERT(layer_1_backward_output[10] == 0);
   GALOIS_LOG_ASSERT(layer_1_backward_output[11] == 0);
@@ -134,12 +133,12 @@ int main() {
   galois::PointerWithSize<galois::GNNFloat> layer_1_weight_gradients =
       layer_1->GetLayerWeightGradients();
 
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[0] == 6);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[1] == 6);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[2] == 6);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[3] == 6);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[4] == 6);
-  GALOIS_LOG_ASSERT(layer_1_weight_gradients[5] == 6);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[0] == 9);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[1] == 9);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[2] == 9);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[3] == 9);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[4] == 9);
+  GALOIS_LOG_ASSERT(layer_1_weight_gradients[5] == 9);
 
   return 0;
 }
