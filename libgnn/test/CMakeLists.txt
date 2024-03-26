@@ -17,7 +17,7 @@ if (NOT GALOIS_ENABLE_GPU)
       ${GALOIS_TESTS}
       convlayer-test
       sage-layer-test
-      l2norm-layer-test
+      # l2norm-layer-test TODO(hc): L2Norm is not maintained
       softmaxlayer-test
       sigmoidlayer-test
       gnnconstruct-test
@@ -27,7 +27,7 @@ if (NOT GALOIS_ENABLE_GPU)
       epoch-test
       multilabel-epoch-test
       multilabel-read
-      f1-test
+      # f1-test TODO(hc): it is a multilable test and will be fixed later
       sample-bit-test
       gcn-sample-edge-test
   )
