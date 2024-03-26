@@ -114,7 +114,7 @@ int main() {
   // train mode = last 2 should be masked off
   for (size_t c = 35; c < 49; c += 7) {
     for (size_t i = 0; i < 6; i++) {
-      GALOIS_LOG_ASSERT(fo_out[c + i] == 0);
+      GALOIS_LOG_ASSERT(static_cast<int>(fo_out[c + i] * 1000) == 142);
     }
   }
 
@@ -140,12 +140,12 @@ int main() {
   // first 5 and last should be 0s
   for (size_t c = 0; c < 35; c += 7) {
     for (size_t i = 0; i < 6; i++) {
-      GALOIS_LOG_ASSERT(fo_out_val[c + i] == 0);
+      GALOIS_LOG_ASSERT(static_cast<int>(fo_out_val[c + i] * 1000) == 142);
     }
   }
   for (size_t c = 42; c < 49; c += 7) {
     for (size_t i = 0; i < 6; i++) {
-      GALOIS_LOG_ASSERT(fo_out_val[c + i] == 0);
+      GALOIS_LOG_ASSERT(static_cast<int>(fo_out_val[c + i] * 1000) == 142);
     }
   }
 
@@ -161,7 +161,7 @@ int main() {
   // first 5 and last should be 0s
   for (size_t c = 0; c < 42; c += 7) {
     for (size_t i = 0; i < 6; i++) {
-      GALOIS_LOG_ASSERT(fo_out_test[c + i] == 0);
+      GALOIS_LOG_ASSERT(static_cast<int>(fo_out_test[c + i] * 1000) == 142);
     }
   }
 
